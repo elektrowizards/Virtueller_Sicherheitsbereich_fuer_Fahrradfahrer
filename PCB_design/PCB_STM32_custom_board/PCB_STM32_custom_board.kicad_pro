@@ -52,21 +52,21 @@
         "zones": {
           "border_display_style": 2,
           "border_hatch_pitch": 0.5,
-          "corner_radius": 0.0,
-          "corner_smoothing": 0,
+          "corner_radius": 4.0,
+          "corner_smoothing": 1,
           "fill_mode": 0,
           "hatch_gap": 1.5,
           "hatch_orientation": 0.0,
           "hatch_smoothing_level": 0,
           "hatch_smoothing_value": 0.1,
           "hatch_thickness": 1.0,
-          "min_clearance": 0.5,
-          "min_island_area": 10.0,
-          "min_thickness": 0.25,
+          "min_clearance": 0.399999,
+          "min_island_area": 9.99999999996,
+          "min_thickness": 0.2,
           "pad_connection": 1,
           "remove_islands": 0,
-          "thermal_relief_gap": 0.5,
-          "thermal_relief_spoke_width": 0.5
+          "thermal_relief_gap": 0.399999,
+          "thermal_relief_spoke_width": 0.399999
         }
       },
       "diff_pair_dimensions": [
@@ -81,7 +81,28 @@
           "width": 0.3
         }
       ],
-      "drc_exclusions": [],
+      "drc_exclusions": [
+        [
+          "clearance|164435000|124775000|b46e6bbd-ad5b-46f3-9753-53405fb06fb4|f6300235-71f7-4dfb-b257-872314a1ef67",
+          ""
+        ],
+        [
+          "clearance|164435000|125725000|0e2cf955-8d11-4f52-aace-2930e1ac4ce0|f6300235-71f7-4dfb-b257-872314a1ef67",
+          ""
+        ],
+        [
+          "clearance|166485000|123825000|e1760203-077e-49d3-9497-35a67e4a77a8|f6300235-71f7-4dfb-b257-872314a1ef67",
+          ""
+        ],
+        [
+          "clearance|166485000|124775000|c0474cca-ee9c-4ed0-a9eb-9a0d2a431dc2|f6300235-71f7-4dfb-b257-872314a1ef67",
+          ""
+        ],
+        [
+          "clearance|166485000|125725000|196f0b28-4731-4be6-a1cc-88bd407467e6|f6300235-71f7-4dfb-b257-872314a1ef67",
+          ""
+        ]
+      ],
       "meta": {
         "version": 2
       },
@@ -264,7 +285,7 @@
       "internal_id": "",
       "mfg": "",
       "mpn": "",
-      "sch_revision": "7"
+      "sch_revision": "8"
     },
     "layer_pairs": [],
     "layer_presets": [],
@@ -548,7 +569,7 @@
     "last_paths": {
       "idf": "",
       "netlist": "",
-      "plot": "",
+      "plot": "../plot_schematics/",
       "specctra_dsn": "",
       "vrml": ""
     },
@@ -684,7 +705,7 @@
         "uuid": "f2af9b37-8671-492d-bd69-acebebd8ef6f"
       }
     ],
-    "used_designators": "U3",
+    "used_designators": "H1-4",
     "variants": []
   },
   "sheets": [
