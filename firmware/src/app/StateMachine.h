@@ -103,6 +103,7 @@ private:
     void saveReference();
     void printReference();
 
+    float runBeamTargetRad(float phiRad) const;
     float shaftFromBeam(float alphaRad) const;
     float beamFromShaft(float shaftRad) const;
     float actualBeamRad();

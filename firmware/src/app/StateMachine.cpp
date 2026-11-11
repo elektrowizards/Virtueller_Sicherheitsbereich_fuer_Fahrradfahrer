@@ -367,6 +367,15 @@ void StateMachine::finishCalibration() {
 // HOMING / ALIGN TARGET
 // ==========================================
 
+// RUN target in the housing frame for roll phi. The ALIGN fine trim is
+// kept as a constant world-angle offset.
+float StateMachine::runBeamTargetRad(float phiRad) const {
+    const float theta = RUN_HOLD_DISTANCE
+        ? Geometry::requiredWorldAngleRad(phiRad, TARGET_DISTANCE_M)
+        : theta0Rad_;
+    return theta + alignTrimRad_ - phiRad;
+}
+
 float StateMachine::shaftFromBeam(float alphaRad) const {
     return shaftHorizontalRad_ + beamToShaft_ * alphaRad;
 }
@@ -625,7 +634,7 @@ void StateMachine::beginRun(uint32_t now) {
     // RUN reference: world angle theta0 (+ the ALIGN fine trim) at phi = 0.
     alignedBeamRad_ = theta0Rad_ + alignTrimRad_;
     alignedMotorRad_ = shaftFromBeam(alignedBeamRad_);
-    motorTargetRad_ = shaftFromBeam(alignedBeamRad_ - rollRad);
+    motorTargetRad_ = shaftFromBeam(runBeamTargetRad(rollRad));
 
     motor_.setTarget(motorTargetRad_);
 
@@ -633,7 +642,9 @@ void StateMachine::beginRun(uint32_t now) {
     lastEncoderCheckMs_ = now;
 
     changeState(State::RUN);
-    Serial.println("STABILIZATION ACTIVE - LASER OFF");
+    Serial.println(RUN_HOLD_DISTANCE
+        ? "STABILIZATION ACTIVE (line distance hold) - LASER OFF"
+        : "STABILIZATION ACTIVE (beam angle hold) - LASER OFF");
 }
 
 // ==========================================
@@ -672,9 +683,10 @@ void StateMachine::updateMotor(uint32_t now) {
 
         // Outer stabilization loop:
         // IMU -> geometry -> motor angle setpoint
-        // Pure gimbal: hold the world beam angle (theta0 + trim).
-        float alphaTarget = alignedBeamRad_ - rollRad;
-        float target = shaftFromBeam(alphaTarget);
+        // Outer loop: IMU roll -> geometry -> beam angle -> shaft target.
+        // Distance hold: alpha = theta(phi) - phi, so the line stays at
+        // TARGET_DISTANCE_M on the ground (laser moves with the lean).
+        float target = shaftFromBeam(runBeamTargetRad(rollRad));
 
         // Synthetic track test ('q'): software sine instead of IMU roll.
         if (trackTest.isSynthetic()) {

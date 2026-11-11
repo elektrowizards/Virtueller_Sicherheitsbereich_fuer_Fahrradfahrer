@@ -77,6 +77,11 @@ constexpr float AXIS_OUTWARD_M = TABLE_TEST ? AXIS_OUTWARD_OF_EDGE_M : BIKE_AXIS
 // An offset ALONG the beam (11.22 mm emitter offset) has no effect.
 constexpr float LASER_BEAM_OFFSET_M = 0.0f;
 
+// RUN mode:
+//   true  = hold the LINE DISTANCE on the ground:  alpha = theta(phi) - phi
+//   false = hold the world BEAM ANGLE (pure gimbal): alpha = theta0 - phi
+constexpr bool RUN_HOLD_DISTANCE = true;
+
 constexpr float MIN_HEIGHT_M = 0.20f;   // ToF plausibility (ToF bypassed)
 constexpr float MAX_HEIGHT_M = 2.00f;
 
