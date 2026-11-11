@@ -11,6 +11,7 @@ bool IMU::enableReports() {
 }
 
 bool IMU::begin(TwoWire& wire) {
+    wire_ = &wire;
     healthy_ = bno_.begin_I2C(
         BNO085_ADDRESS,
         &wire
@@ -75,4 +76,18 @@ bool IMU::takeReset() {
     bool reset = resetDetected_;
     resetDetected_ = false;
     return reset;
+}
+
+bool IMU::recover(uint8_t level) {
+    if (!wire_) return false;
+
+    valid_ = false;
+
+    if (level == 0) {
+        healthy_ = enableReports();
+        return healthy_;
+    }
+
+    healthy_ = bno_.begin_I2C(BNO085_ADDRESS, wire_) && enableReports();
+    return healthy_;
 }

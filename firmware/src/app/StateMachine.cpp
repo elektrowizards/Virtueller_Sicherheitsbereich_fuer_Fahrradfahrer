@@ -1310,8 +1310,37 @@ void StateMachine::update() {
             Serial.println(" ms");
         }
 
-        // Check communication health
-        if (!imu_.isHealthy()) {
+        // Recovery in IDLE only (motor off). In ALIGN/RUN a data loss
+        // stays a fault (IMU timeout checks are unchanged).
+        if (state_ == State::IDLE) {
+            if (imu_.isFresh(IMU_TIMEOUT_MS)) {
+                if (imuRecovering_) {
+                    Serial.println("[IMU] data resumed - ready (blue LED blinks fast)");
+                }
+                imuRecovering_ = false;
+                imuRecoverLevel_ = 0;
+            } else if (!imu_.isFresh(1000) &&
+                       (uint32_t)(now - lastImuRecoverMs_) >= 1500) {
+                lastImuRecoverMs_ = now;
+                imuRecovering_ = true;
+
+                Serial.print("[IMU] no data - ");
+                Serial.println(imuRecoverLevel_ == 0
+                    ? "re-enabling the report"
+                    : "re-initialising the BNO085");
+
+                imu_.recover(imuRecoverLevel_);
+                if (imuRecoverLevel_ < 3) imuRecoverLevel_++;
+
+                // begin_I2C() resets the I2C clock; the encoder shares it.
+                bus_.getWire().setClock(s_i2cHz);
+                lastLoopMs_ = 0;   // re-init blocks on purpose
+            }
+        }
+
+        // Check communication health (in IDLE the recovery above keeps
+        // retrying instead; the motor is off there).
+        if (!imu_.isHealthy() && state_ != State::IDLE) {
             fail("BNO085 communication/report error");
             return;
         }

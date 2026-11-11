@@ -82,6 +82,11 @@ private:
     // Main-loop stall diagnostic; 0 = skip the next check (after the
     // intentionally blocking initFOC() and flash write).
     uint32_t lastLoopMs_ = 0;
+
+    // IMU recovery in IDLE (no data for > 1 s)
+    uint32_t lastImuRecoverMs_ = 0;
+    uint8_t imuRecoverLevel_ = 0;
+    bool imuRecovering_ = false;
     uint32_t homingPendingSinceMs_ = 0;
 
     // ---- RUN ----
