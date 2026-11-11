@@ -65,7 +65,7 @@ constexpr float BIKE_AXIS_HEIGHT_M = 0.80f;          // FILL IN when mounted
 constexpr float BIKE_AXIS_OUTWARD_M = 0.0f;
 
 // ---- Table geometry (pivot = table edge over which the line is cast) ----
-constexpr float TABLE_SURFACE_HEIGHT_M = 0.75f;      // FILL IN: measure floor -> table top
+constexpr float TABLE_SURFACE_HEIGHT_M = 0.70f;      // FILL IN: measure floor -> table top
 constexpr float AXIS_ABOVE_TABLE_M = 0.060f;         // photo: 60 mm (older local config said 0.0307 - CHECK)
 // Rotation axis lateral offset from the table edge, + = toward line.
 // Photo: axis 36 mm INSIDE the edge -> negative.
@@ -101,7 +101,7 @@ constexpr float ALIGN_STEP_DEG = 1.0f;
 // BEAM_ENCODER_SIGN: +1 if an INCREASING raw AS5600 angle tilts the beam
 // DOWN. Defined in the raw sensor frame, so it does not depend on the
 // sensor_direction SimpleFOC detects in initFOC().
-constexpr float BEAM_ENCODER_SIGN = 1.0f;            // verify on the bench
+constexpr float BEAM_ENCODER_SIGN = -1.0f;            // verify on the bench
 
 // Mechanical travel of the beam relative to the housing:
 // 12 o'clock (straight up, -90) -> line side -> 6 o'clock (down, +90).
