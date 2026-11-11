@@ -10,8 +10,20 @@ bool IMU::enableReports() {
     );
 }
 
+// RST low 10 ms, then wait until the BNO085 has booted before I2C.
+void IMU::hardwareReset() {
+    if (BNO085_RESET_PIN < 0) return;
+
+    pinMode(BNO085_RESET_PIN, OUTPUT);
+    digitalWrite(BNO085_RESET_PIN, LOW);
+    delay(10);
+    digitalWrite(BNO085_RESET_PIN, HIGH);
+    delay(BNO085_BOOT_MS);
+}
+
 bool IMU::begin(TwoWire& wire) {
     wire_ = &wire;
+    hardwareReset();
     healthy_ = bno_.begin_I2C(
         BNO085_ADDRESS,
         &wire
@@ -27,6 +39,7 @@ bool IMU::update() {
     if (!healthy_) return false;
 
     if (bno_.wasReset()) {
+        resetEvents_++;
         resetDetected_ = true;
         valid_ = false;
         healthy_ = enableReports();
@@ -37,8 +50,10 @@ bool IMU::update() {
     if (!bno_.getSensorEvent(&event_))
         return false;
 
-    if (event_.sensorId != SH2_GAME_ROTATION_VECTOR)
+    if (event_.sensorId != SH2_GAME_ROTATION_VECTOR) {
+        otherEvents_++;
         return false;
+    }
 
     float qx = event_.un.gameRotationVector.i;
     float qy = event_.un.gameRotationVector.j;
@@ -88,6 +103,19 @@ bool IMU::recover(uint8_t level) {
         return healthy_;
     }
 
+    hardwareReset();
     healthy_ = bno_.begin_I2C(BNO085_ADDRESS, wire_) && enableReports();
     return healthy_;
+}
+
+uint32_t IMU::takeOtherEvents() {
+    uint32_t n = otherEvents_;
+    otherEvents_ = 0;
+    return n;
+}
+
+uint32_t IMU::takeResetEvents() {
+    uint32_t n = resetEvents_;
+    resetEvents_ = 0;
+    return n;
 }

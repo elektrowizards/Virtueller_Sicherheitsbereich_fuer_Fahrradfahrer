@@ -21,8 +21,14 @@ public:
     // Returns true if the IMU accepted the command.
     bool recover(uint8_t level);
 
+    // Diagnostics: events since the last call (then reset to 0)
+    uint32_t takeOtherEvents();   // sensor events that were not the RV
+    uint32_t takeResetEvents();   // reset notifications from the BNO085
+
 private:
-    Adafruit_BNO08x bno_{BNO085_RESET_PIN};
+    // The reset pin is driven by IMU::hardwareReset() (with a proper boot
+    // wait), not by the library (it only waits 10 ms after the pulse).
+    Adafruit_BNO08x bno_{-1};
     TwoWire* wire_ = nullptr;
     sh2_SensorValue_t event_{};
 
@@ -33,5 +39,9 @@ private:
     bool healthy_ = false;
     bool resetDetected_ = false;
 
+    uint32_t otherEvents_ = 0;
+    uint32_t resetEvents_ = 0;
+
     bool enableReports();
+    void hardwareReset();
 };

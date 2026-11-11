@@ -1341,11 +1341,18 @@ void StateMachine::update() {
                 imuRecovering_ = false;
                 imuRecoverLevel_ = 0;
             } else if (!imu_.isFresh(1000) &&
-                       (uint32_t)(now - lastImuRecoverMs_) >= 1500) {
+                       (uint32_t)(now - lastImuRecoverMs_) >= 3000) {
                 lastImuRecoverMs_ = now;
                 imuRecovering_ = true;
 
-                Serial.print("[IMU] no data - ");
+                // What did the BNO085 send since the last attempt?
+                Serial.print("[IMU] no data (other events: ");
+                Serial.print(imu_.takeOtherEvents());
+                Serial.print(", reset notices: ");
+                Serial.print(imu_.takeResetEvents());
+                Serial.print(", healthy: ");
+                Serial.print(imu_.isHealthy() ? "yes" : "no");
+                Serial.print(") - ");
                 Serial.println(imuRecoverLevel_ == 0
                     ? "re-enabling the report"
                     : "re-initialising the BNO085");

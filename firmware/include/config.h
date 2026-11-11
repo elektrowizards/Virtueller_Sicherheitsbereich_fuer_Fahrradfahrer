@@ -39,6 +39,7 @@ constexpr uint8_t BNO085_ADDRESS = 0x4A;
 // the STM32 alone leaves the BNO085 running in its old state, which can
 // hang the first I2C reads. Set to -1 if RST is not connected.
 constexpr int8_t BNO085_RESET_PIN = D7;
+constexpr uint32_t BNO085_BOOT_MS = 300;   // wait after the RST pulse
 constexpr uint8_t AS5600_ADDRESS = 0x36;
 
 constexpr uint32_t IMU_REPORT_US = 20000; // 50 Hz
