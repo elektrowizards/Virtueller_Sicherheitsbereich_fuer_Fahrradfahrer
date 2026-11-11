@@ -1,10 +1,12 @@
-
 #pragma once
 #include <Arduino.h>
+
+#include "config.h"
 
 #include "drivers/I2CBus.h"
 #include "drivers/IMU.h"
 #include "drivers/ToF.h"
+#include "drivers/LaserDriver.h"
 
 #include "estimation/RollEstimator.h"
 #include "control/MotorControl.h"
@@ -44,6 +46,7 @@ private:
     ToF tof_;
     RollEstimator roll_;
     MotorControl motor_;
+    LaserDriver laser_{LASER_PIN};
 
     ButtonHandler button_;
     CalibrationStorage storage_;
@@ -69,6 +72,7 @@ private:
     const char* faultText_ = "none";
 
     void changeState(State next);
+    void applyLaserForState();
     void fail(const char* message);
 
     void handleButton(ButtonEvent event, uint32_t now);
@@ -85,4 +89,5 @@ private:
     void printStatus(uint32_t now);
 
     const char* stateName(State state) const;
+    const char* laserName() const;
 };

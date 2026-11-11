@@ -21,8 +21,13 @@ constexpr uint32_t I2C_SDA_PIN = D14;   // PB9
 constexpr uint32_t I2C_SCL_PIN = D15;   // PB8
 constexpr uint32_t I2C_FREQUENCY = 50000;
 
-// Reserved laser pin: ALWAYS OFF for bench testing
-constexpr uint32_t LASER_PIN = D4;
+// Laser: low-side switch (NPN on prototype, AO3400A on PCB), HIGH = on.
+// Use PB0 directly: A3 maps to PB0 on the Nucleo, but not necessarily
+// in the generic STM32F446RE variant used for the custom PCB.
+constexpr uint32_t LASER_PIN = PB0;     // Nucleo A3
+
+// false = laser stays off in every state (bench testing without laser)
+constexpr bool LASER_ENABLED = true;
 
 // ======================================
 // SENSOR SETTINGS
@@ -39,8 +44,22 @@ constexpr float IMU_ROLL_SIGN = 1.0f;
 // ======================================
 // STABILIZATION GEOMETRY
 // ======================================
-constexpr float TARGET_DISTANCE_M = 1.50f;
-constexpr float FIXED_HEIGHT_M = 0.80f;
+// ---- Height of the laser rotation axis above the ground ----
+// true  = prototype on the table, line projected onto the floor
+// false = mounted on the bike
+constexpr bool  TABLE_TEST             = true;
+
+constexpr float TABLE_SURFACE_HEIGHT_M = 0.75f;    // floor to tabletop, MEASURE YOURS
+constexpr float AXIS_ABOVE_TABLE_M     = 0.0307f;  // tabletop to rotation axis
+constexpr float BIKE_AXIS_HEIGHT_M     = 0.80f;    // ground to rotation axis on the bike
+
+constexpr float FIXED_HEIGHT_M = TABLE_TEST
+    ? (TABLE_SURFACE_HEIGHT_M + AXIS_ABOVE_TABLE_M)
+    : BIKE_AXIS_HEIGHT_M;
+
+// ---- Target line distance ----
+// Measured sideways from the point on the ground directly below the axis
+constexpr float TARGET_DISTANCE_M      = 1.50f;
 
 constexpr float MIN_HEIGHT_M = 0.20f;
 constexpr float MAX_HEIGHT_M = 2.00f;
