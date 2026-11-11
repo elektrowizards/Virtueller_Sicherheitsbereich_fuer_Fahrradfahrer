@@ -2,6 +2,7 @@
 #include "config.h"
 #include "control/Geometry.h"
 #include "TrackTest.h"
+#include "TiltTest.h"
 
 #include <math.h>
 
@@ -62,6 +63,7 @@ void StateMachine::changeState(State next) {
     // A running track test is only valid in RUN.
     if (next != State::RUN) {
         trackTest.abort(stateName(next));
+        tiltTest.abort(stateName(next));
     }
 
     state_ = next;
@@ -1006,7 +1008,9 @@ void StateMachine::handleSerial(uint32_t now) {
                 Serial.println("R = Track test, summary + CSV (RUN)");
                 Serial.println("q = Synthetic track test, board still (RUN)");
                 Serial.println("Q = Synthetic track test + CSV (RUN)");
-                Serial.println("x = Abort track test");
+                Serial.println("g = Guided tilt test (RUN): prompts the angles");
+                Serial.println("n = Next step of the tilt test");
+                Serial.println("x = Abort track / tilt test");
                 Serial.println("i = Toggle I2C clock 100k/400k");
                 Serial.println("l = Toggle laser (ALIGN/RUN)");
             }
@@ -1017,7 +1021,9 @@ void StateMachine::handleSerial(uint32_t now) {
 
             else if (command == 'r' || command == 'R' ||
                      command == 'q' || command == 'Q') {
-                if (state_ == State::RUN) {
+                if (tiltTest.isActive()) {
+                    Serial.println("[TRACK] Not during the tilt test ('x' aborts it)");
+                } else if (state_ == State::RUN) {
                     trackTest.start(command == 'R' || command == 'Q',
                                     command == 'q' || command == 'Q');
                 } else {
@@ -1027,6 +1033,25 @@ void StateMachine::handleSerial(uint32_t now) {
 
             else if (command == 'x') {
                 trackTest.abort("user");
+                tiltTest.abort("user");
+            }
+
+            // =====================================
+            // GUIDED TILT TEST
+            // =====================================
+
+            else if (command == 'g') {
+                if (state_ != State::RUN) {
+                    Serial.println("[TILT] Only available in RUN (double press in ALIGN)");
+                } else if (trackTest.isActive()) {
+                    Serial.println("[TILT] Not during a track test");
+                } else {
+                    tiltTest.start();
+                }
+            }
+
+            else if (command == 'n') {
+                tiltTest.next();
             }
 
             // =====================================
@@ -1295,6 +1320,21 @@ void StateMachine::update() {
             Geometry::radToDeg(motorTargetRad_),
             Geometry::radToDeg(motor_.getAngle())
         );
+
+        // Guided tilt test ('g'): does nothing unless started.
+        if (tiltTest.isActive()) {
+            const float phi = roll_.getLineRoll();
+            const float alpha = actualBeamRad();
+            tiltTest.update(
+                now,
+                Geometry::radToDeg(phi),
+                Geometry::predictedDistanceM(alpha, phi),
+                Geometry::predictedDistanceM(
+                    theta0Rad_ + alignTrimRad_ - phi, phi),
+                Geometry::radToDeg(motorTargetRad_ - motor_.getAngle()),
+                motor_.getVoltageQ()
+            );
+        }
     }
 
     // ==========================================
@@ -1309,6 +1349,7 @@ void StateMachine::update() {
         autoStatusEnabled_ &&
         !commandInProgress_ &&
         !trackTest.isActive() &&
+        !tiltTest.isActive() &&
         (uint32_t)(now - lastStatusMs_)
             >= STATUS_PERIOD_MS) {
 
