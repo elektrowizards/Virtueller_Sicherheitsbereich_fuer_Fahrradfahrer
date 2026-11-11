@@ -75,6 +75,10 @@ private:
     // The loop's 'now' is taken before initFOC() blocks, so the ramp
     // clock is (re)started on the first updateAlignTarget() call.
     bool rampClockValid_ = false;
+    // initFOC() blocks for 1-2 s without IMU polling: homing waits for
+    // fresh IMU data before it starts.
+    bool homingPending_ = false;
+    uint32_t homingPendingSinceMs_ = 0;
 
     // ---- RUN ----
     float alignedBeamRad_ = NAN;     // theta0 + trim (world angle at phi=0)

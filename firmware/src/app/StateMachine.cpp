@@ -395,6 +395,7 @@ void StateMachine::finishCalibration() {
     alphaGoalRad_ = NAN;
     homing_ = false;
     homed_ = false;
+    homingPending_ = false;
     rampClockValid_ = false;
 
     motorTargetRad_ = shaft;
@@ -414,7 +415,10 @@ void StateMachine::finishCalibration() {
     Serial.println(laserName());
 
     if (refValid_) {
-        startHoming(millis());
+        // Started from updateAlignTarget() once the IMU is fresh again.
+        homingPending_ = true;
+        homingPendingSinceMs_ = millis();
+        Serial.println("HOMING: waiting for fresh IMU data...");
     } else {
         Serial.println("NO REFERENCE STORED - homing refused.");
         Serial.println("One-time reference: housing LEVEL on the table,");
@@ -529,6 +533,17 @@ void StateMachine::updateAlignTarget(uint32_t now) {
         rampClockValid_ = true;
         lastRampMs_ = now;
         homingStartMs_ = now;
+    }
+
+    if (homingPending_) {
+        if (imu_.isFresh(IMU_TIMEOUT_MS) && roll_.isValid()) {
+            homingPending_ = false;
+            startHoming(now);
+        } else if ((int32_t)(now - homingPendingSinceMs_) > 2000) {
+            homingPending_ = false;
+            homing_ = false;
+            Serial.println("HOMING refused: no fresh IMU data after alignment.");
+        }
     }
 
     float dt = (int32_t)(now - lastRampMs_) * 0.001f;
