@@ -33,6 +33,12 @@ constexpr bool LASER_ENABLED = true;
 // SENSOR SETTINGS
 // ======================================
 constexpr uint8_t BNO085_ADDRESS = 0x4A;
+
+// BNO085 RST pin (active LOW). Wired to D7 (PA8), the IMU is hardware-
+// reset at every begin (boot and IMU recovery). Without it, a reset of
+// the STM32 alone leaves the BNO085 running in its old state, which can
+// hang the first I2C reads. Set to -1 if RST is not connected.
+constexpr int8_t BNO085_RESET_PIN = D7;
 constexpr uint8_t AS5600_ADDRESS = 0x36;
 
 constexpr uint32_t IMU_REPORT_US = 20000; // 50 Hz

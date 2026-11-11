@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <Adafruit_BNO08x.h>
+#include "config.h"
 
 class IMU {
 public:
@@ -21,7 +22,7 @@ public:
     bool recover(uint8_t level);
 
 private:
-    Adafruit_BNO08x bno_{-1};
+    Adafruit_BNO08x bno_{BNO085_RESET_PIN};
     TwoWire* wire_ = nullptr;
     sh2_SensorValue_t event_{};
 
