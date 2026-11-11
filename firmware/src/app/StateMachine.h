@@ -72,6 +72,9 @@ private:
     uint32_t homingStartMs_ = 0;
     uint32_t homingTimeoutMs_ = 0;
     uint32_t lastRampMs_ = 0;
+    // The loop's 'now' is taken before initFOC() blocks, so the ramp
+    // clock is (re)started on the first updateAlignTarget() call.
+    bool rampClockValid_ = false;
 
     // ---- RUN ----
     float alignedBeamRad_ = NAN;     // theta0 + trim (world angle at phi=0)
