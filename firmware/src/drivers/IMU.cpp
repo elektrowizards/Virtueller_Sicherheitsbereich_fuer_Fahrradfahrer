@@ -35,19 +35,40 @@ bool IMU::begin(TwoWire& wire) {
     return healthy_;
 }
 
+// Boot diagnostics: the first calls print each step (flushed), so a hang
+// shows exactly which library call never returns.
+static uint8_t s_traceCalls = 0;
+static void trace(const char* step) {
+    if (s_traceCalls >= 3) return;
+    Serial.print(step);
+    Serial.flush();
+}
+
 bool IMU::update() {
     if (!healthy_) return false;
+
+    trace("[a:wasReset ");
 
     if (bno_.wasReset()) {
         resetEvents_++;
         resetDetected_ = true;
         valid_ = false;
+        trace("b:enableReport ");
         healthy_ = enableReports();
 
-        if (!healthy_) return false;
+        if (!healthy_) {
+            trace("FAILED] ");
+            s_traceCalls++;
+            return false;
+        }
     }
 
-    if (!bno_.getSensorEvent(&event_))
+    trace("c:getSensorEvent ");
+    const bool got = bno_.getSensorEvent(&event_);
+    trace(got ? "d:event] " : "d:none] ");
+    if (s_traceCalls < 3) s_traceCalls++;
+
+    if (!got)
         return false;
 
     if (event_.sensorId != SH2_GAME_ROTATION_VECTOR) {
