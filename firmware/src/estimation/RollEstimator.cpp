@@ -1,39 +1,33 @@
-
 #include "RollEstimator.h"
 #include "config.h"
+#include "control/Geometry.h"
 #include <math.h>
 
-namespace {
-    constexpr float PI_F = 3.14159265358979323846f;
-    constexpr float TWO_PI_F = 2.0f * PI_F;
+void RollEstimator::update(float imuRollRad) {
+    if (!isfinite(imuRollRad)) return;
 
-    float wrapPi(float angle) {
-        while (angle > PI_F) angle -= TWO_PI_F;
-        while (angle < -PI_F) angle += TWO_PI_F;
-        return angle;
-    }
-}
-
-void RollEstimator::update(float rollRad) {
-    if (!isfinite(rollRad)) return;
-
-    rollRad_ = wrapPi(IMU_ROLL_SIGN * rollRad);
+    rightRollRad_ = Geometry::wrapPi(IMU_ROLL_SIGN * imuRollRad);
     valid_ = true;
 }
 
-void RollEstimator::setReference() {
-    if (valid_)
-        referenceRad_ = rollRad_;
+void RollEstimator::setMountOffset(float offsetRad) {
+    if (!isfinite(offsetRad)) return;
+    offsetRad_ = Geometry::wrapPi(offsetRad);
+    offsetValid_ = true;
 }
 
-float RollEstimator::getRoll() const {
-    return rollRad_;
+void RollEstimator::clearMountOffset() {
+    offsetRad_ = 0.0f;
+    offsetValid_ = false;
 }
 
-float RollEstimator::getRelativeRoll() const {
-    if (!valid_) return NAN;
+float RollEstimator::getRightRoll() const {
+    return valid_ ? rightRollRad_ : NAN;
+}
 
-    return wrapPi(rollRad_ - referenceRad_);
+float RollEstimator::getLineRoll() const {
+    if (!valid_ || !offsetValid_) return NAN;
+    return LINE_SIDE * Geometry::wrapPi(rightRollRad_ - offsetRad_);
 }
 
 bool RollEstimator::isValid() const {

@@ -198,6 +198,11 @@ float MotorControl::getAngle() {
     return motor_.shaft_angle;
 }
 
+float MotorControl::getRawAngle() {
+    if (!active_) return NAN;
+    return encoder_.getMechanicalAngle();
+}
+
 float MotorControl::getTarget() const {
     return targetRad_;
 }

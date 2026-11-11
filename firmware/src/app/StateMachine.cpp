@@ -119,16 +119,34 @@ void StateMachine::begin() {
     Serial.print("I2C clock [Hz]: ");
     Serial.println(s_i2cHz);
 
-    float savedHeight = NAN;
-    if (storage_.loadHeight(savedHeight)) {
-        Serial.print("Previously saved height [m]: ");
-        Serial.println(savedHeight, 3);
+    // Mechanical reference (beam-horizontal encoder angle + IMU mount
+    // offset). Electrical alignment (initFOC) still runs on every start.
+    CalibrationStorage::LoadResult lr = storage_.load(ref_);
+    refValid_ = (lr == CalibrationStorage::LoadResult::OK);
+    if (refValid_) {
+        roll_.setMountOffset(ref_.imuMountOffsetRad);
+    } else {
+        roll_.clearMountOffset();
+        Serial.print("Reference: ");
+        Serial.println(CalibrationStorage::resultText(lr));
     }
+    printReference();
 
-    // A saved height does not replace physical alignment.
-    // Require calibration and alignment on each startup.
-    heightM_ = NAN;
-    theta0Rad_ = NAN;
+    theta0Rad_ = Geometry::nominalAngleRad();
+    Serial.print("Geometry: ");
+    Serial.print(TABLE_TEST ? "TABLE" : "BIKE");
+    Serial.print(" p=");
+    Serial.print(PIVOT_HEIGHT_M, 3);
+    Serial.print(" r_up=");
+    Serial.print(AXIS_ABOVE_PIVOT_M, 3);
+    Serial.print(" r_out=");
+    Serial.print(AXIS_OUTWARD_M, 3);
+    Serial.print(" D=");
+    Serial.print(TARGET_DISTANCE_M, 3);
+    Serial.print(" side=");
+    Serial.print(LINE_SIDE > 0.0f ? "RIGHT" : "LEFT");
+    Serial.print(" theta0[deg]=");
+    Serial.println(Geometry::radToDeg(theta0Rad_), 2);
 
     changeState(State::IDLE);
 
@@ -201,20 +219,15 @@ void StateMachine::startCalibration() {
     motor_.stop();
     digitalWrite(LASER_PIN, LOW);
 
-    // Use fixed height instead of ToF measurement
-    heightM_ = FIXED_HEIGHT_M;
-
-    // Prepare existing calibration completion logic
-    heightSumM_ = FIXED_HEIGHT_M * REQUIRED_TOF_FRAMES;
+    // ToF bypassed: geometry comes from config.h
+    heightSumM_ = 0.0f;
     calibrationFrames_ = REQUIRED_TOF_FRAMES;
 
-    theta0Rad_ = NAN;
     alignTrimRad_ = 0.0f;
+    homing_ = false;
+    homed_ = false;
 
-    Serial.println("CALIBRATION: Fixed height mode");
-    Serial.print("Height = ");
-    Serial.print(FIXED_HEIGHT_M, 2);
-    Serial.println(" m");
+    Serial.println("CALIBRATION: geometry from config.h (ToF bypassed)");
 
     changeState(State::CALIBRATION);
 
@@ -282,21 +295,9 @@ void StateMachine::finishCalibration() {
         return;
     }
 
-    heightM_ = heightSumM_ / calibrationFrames_;
-    theta0Rad_ = Geometry::nominalAngleRad(heightM_);
+    theta0Rad_ = Geometry::nominalAngleRad();
 
-    // IMU reference: bicycle upright at calibration
-    roll_.setReference();
-
-    if (!storage_.saveHeight(heightM_)) {
-        fail("Could not save calibrated height");
-        return;
-    }
-
-    Serial.print("Height [m] = ");
-    Serial.println(heightM_, 3);
-
-    Serial.print("Nominal downward angle [deg] = ");
+    Serial.print("Nominal world beam angle theta0 [deg] = ");
     Serial.println(Geometry::radToDeg(theta0Rad_), 2);
 
     Serial.println("Starting electrical motor alignment...");
@@ -306,17 +307,275 @@ void StateMachine::finishCalibration() {
         return;
     }
 
-    alignmentBaseRad_ = motor_.getAngle();
-    motorTargetRad_ = alignmentBaseRad_;
-    alignTrimRad_ = 0.0f;
+    // ---- Map the raw encoder frame onto the shaft frame ----
+    // shaft = dir * (raw + 2pi*turns). The stored reference lives in the
+    // raw frame; the shaft offset is rebuilt here after every initFOC().
+    const int dir = motor_.sensorDirection();
+    if (dir != 1 && dir != -1) {
+        fail("Sensor direction unknown after alignment");
+        return;
+    }
+    beamToShaft_ = (float)dir * BEAM_ENCODER_SIGN;
 
+    const float shaft = motor_.getAngle();   // same sample as raw
+    const float raw = motor_.getRawAngle();
+    if (!isfinite(shaft) || !isfinite(raw)) {
+        fail("Encoder angle invalid");
+        return;
+    }
+
+    if (refValid_) {
+        const float alphaNow = BEAM_ENCODER_SIGN *
+            Geometry::wrapPi(raw - ref_.rawHorizontalRad);
+        shaftHorizontalRad_ = shaft - beamToShaft_ * alphaNow;
+    } else {
+        shaftHorizontalRad_ = NAN;
+    }
+
+    // Hold the current position until homing (or trim) moves it.
+    alignBaseShaftRad_ = shaft;
+    rampShaftRad_ = shaft;
+    alignTrimRad_ = 0.0f;
+    alphaGoalRad_ = NAN;
+    homing_ = false;
+    homed_ = false;
+    lastRampMs_ = millis();
+
+    motorTargetRad_ = shaft;
     motor_.setTarget(motorTargetRad_);
+
+    Serial.print("Sensor direction = ");
+    Serial.print(dir);
+    Serial.print(", raw encoder [deg] = ");
+    Serial.println(Geometry::radToDeg(raw), 2);
 
     changeState(State::ALIGN);
 
-    Serial.println("ALIGN: adjust physical laser angle.");
-    Serial.println("Use '[' or ']' for +/-1 degree.");
-    Serial.println("DOUBLE press once physically aligned.");
+    if (refValid_) {
+        startHoming(millis());
+    } else {
+        Serial.println("NO REFERENCE STORED - homing refused.");
+        Serial.println("One-time reference: housing LEVEL on the table,");
+        Serial.print("trim with '[' (beam up) / ']' (beam down) until the line hits the mark at ");
+        Serial.print(REFERENCE_DISTANCE_M, 3);
+        Serial.println(" m from the edge,");
+        Serial.println("then send 'z' to save.");
+    }
+}
+
+// ==========================================
+// HOMING / ALIGN TARGET
+// ==========================================
+
+float StateMachine::shaftFromBeam(float alphaRad) const {
+    return shaftHorizontalRad_ + beamToShaft_ * alphaRad;
+}
+
+float StateMachine::beamFromShaft(float shaftRad) const {
+    // beamToShaft_ is +/-1
+    return (shaftRad - shaftHorizontalRad_) * beamToShaft_;
+}
+
+float StateMachine::actualBeamRad() {
+    if (!refValid_ || !isfinite(shaftHorizontalRad_)) return NAN;
+    return beamFromShaft(motor_.getAngle());
+}
+
+void StateMachine::startHoming(uint32_t now) {
+    const float alphaNow = actualBeamRad();
+    const float phi = roll_.getLineRoll();
+
+    if (!isfinite(alphaNow) || !isfinite(phi) ||
+        !imu_.isFresh(IMU_TIMEOUT_MS)) {
+        Serial.println("HOMING refused: no reference or no IMU roll.");
+        return;
+    }
+
+    if (fabsf(phi) > Geometry::degToRad(MAX_ROLL_DEG)) {
+        Serial.println("HOMING refused: housing roll exceeds MAX_ROLL_DEG.");
+        return;
+    }
+
+    // World angle theta0 for the current housing roll: alpha = theta0 - phi
+    const float goal = theta0Rad_ - phi;
+
+    const float minA = Geometry::degToRad(BEAM_MIN_DEG);
+    const float maxA = Geometry::degToRad(BEAM_MAX_DEG);
+    const float margin = Geometry::degToRad(HOMING_START_MARGIN_DEG);
+
+    Serial.print("HOMING: alpha now [deg] = ");
+    Serial.print(Geometry::radToDeg(alphaNow), 2);
+    Serial.print(", goal [deg] = ");
+    Serial.print(Geometry::radToDeg(goal), 2);
+    Serial.print(", phi [deg] = ");
+    Serial.println(Geometry::radToDeg(phi), 2);
+
+    if (alphaNow < minA - margin || alphaNow > maxA + margin) {
+        Serial.println("HOMING refused: beam outside the mechanical travel.");
+        Serial.println("Check the reference ('p') / BEAM_ENCODER_SIGN, or redo 'z'.");
+        return;
+    }
+
+    if (goal < minA || goal > maxA) {
+        Serial.println("HOMING refused: goal outside the mechanical travel.");
+        return;
+    }
+
+    // Travel is limited (no wrap-around), so the direct move in alpha is
+    // the shortest path that stays inside [BEAM_MIN, BEAM_MAX].
+    const float travel = fabsf(goal - alphaNow);
+    if (travel > Geometry::degToRad(HOMING_MAX_TRAVEL_DEG)) {
+        Serial.println("HOMING refused: travel exceeds HOMING_MAX_TRAVEL_DEG.");
+        return;
+    }
+
+    alphaGoalRad_ = goal;
+    alignBaseShaftRad_ = shaftFromBeam(goal);
+    rampShaftRad_ = motor_.getAngle();
+    alignTrimRad_ = 0.0f;
+
+    homing_ = true;
+    homed_ = false;
+    homingStartMs_ = now;
+    lastRampMs_ = now;
+    homingTimeoutMs_ = (uint32_t)(Geometry::radToDeg(travel) /
+                                  HOMING_RATE_DEG_S * 1000.0f) +
+                       HOMING_SETTLE_MS;
+}
+
+// Called from updateMotor() in ALIGN every MOTOR_TARGET_PERIOD_MS.
+void StateMachine::updateAlignTarget(uint32_t now) {
+    const float dt = (uint32_t)(now - lastRampMs_) * 0.001f;
+    lastRampMs_ = now;
+
+    // Slew-rate limited approach of the goal: keeps the position error
+    // small, so Uq stays below the 2 V limit (no saturation flips).
+    const float maxStep = Geometry::degToRad(HOMING_RATE_DEG_S) * dt;
+    const float diff = alignBaseShaftRad_ - rampShaftRad_;
+
+    if (fabsf(diff) <= maxStep) rampShaftRad_ = alignBaseShaftRad_;
+    else rampShaftRad_ += (diff > 0.0f) ? maxStep : -maxStep;
+
+    motorTargetRad_ = rampShaftRad_ + beamToShaft_ * alignTrimRad_;
+
+    if (!homing_) return;
+
+    const float actual = motor_.getAngle();
+    if (rampShaftRad_ == alignBaseShaftRad_ && isfinite(actual) &&
+        fabsf(actual - motorTargetRad_) <
+            Geometry::degToRad(HOMED_TOLERANCE_DEG)) {
+
+        homing_ = false;
+        homed_ = true;
+
+        const float alpha = actualBeamRad();
+        const float phi = roll_.getLineRoll();
+
+        Serial.print("HOMED in ");
+        Serial.print(now - homingStartMs_);
+        Serial.print(" ms: alpha [deg] = ");
+        Serial.print(Geometry::radToDeg(alpha), 2);
+        Serial.print(", theta [deg] = ");
+        Serial.print(Geometry::radToDeg(alpha + phi), 2);
+        Serial.print(", predicted line [m] = ");
+        Serial.println(Geometry::predictedDistanceM(alpha, phi), 3);
+        Serial.println("Fine trim with '[' / ']', DOUBLE press -> RUN.");
+        return;
+    }
+
+    if ((uint32_t)(now - homingStartMs_) > homingTimeoutMs_) {
+        homing_ = false;
+        fail("Homing did not converge");
+    }
+}
+
+// ==========================================
+// ONE-TIME MECHANICAL REFERENCE ('z')
+// ==========================================
+
+void StateMachine::saveReference() {
+    if (state_ != State::ALIGN || !motor_.isActive()) {
+        Serial.println("[REF] Only in ALIGN (short press first).");
+        return;
+    }
+    if (homing_) {
+        Serial.println("[REF] Wait until homing is finished.");
+        return;
+    }
+    if (!imu_.isFresh(IMU_TIMEOUT_MS) || !roll_.isValid()) {
+        Serial.println("[REF] IMU data unavailable.");
+        return;
+    }
+
+    const float raw = motor_.getRawAngle();
+    const float shaft = motor_.getAngle();
+    if (!isfinite(raw) || !isfinite(shaft)) {
+        Serial.println("[REF] Encoder angle invalid.");
+        return;
+    }
+
+    // Housing is level by definition (phi = 0) and the line is on the
+    // mark at REFERENCE_DISTANCE_M, so the current beam angle is:
+    const float alphaRef = Geometry::requiredWorldAngleRad(
+        0.0f, REFERENCE_DISTANCE_M);
+
+    CalibrationStorage::Reference next = {};
+    next.rawHorizontalRad = Geometry::wrapTwoPi(
+        raw - BEAM_ENCODER_SIGN * alphaRef);
+    next.imuMountOffsetRad = roll_.getRightRoll();
+    next.refDistanceM = REFERENCE_DISTANCE_M;
+
+    Serial.println("=== REFERENCE ===");
+    Serial.print("raw encoder now [deg]      = ");
+    Serial.println(Geometry::radToDeg(raw), 3);
+    Serial.print("beam angle at mark [deg]   = ");
+    Serial.println(Geometry::radToDeg(alphaRef), 3);
+    Serial.print("raw beam-horizontal [deg]  = ");
+    Serial.println(Geometry::radToDeg(next.rawHorizontalRad), 3);
+    Serial.print("IMU mount offset [deg]     = ");
+    Serial.println(Geometry::radToDeg(next.imuMountOffsetRad), 3);
+    Serial.print("reference distance [m]     = ");
+    Serial.println(next.refDistanceM, 3);
+    Serial.print("trim applied [deg]         = ");
+    Serial.println(Geometry::radToDeg(alignTrimRad_), 2);
+
+    if (refValid_) {
+        Serial.print("change vs. old ref: horizontal [deg] = ");
+        Serial.print(Geometry::radToDeg(Geometry::wrapPi(
+            next.rawHorizontalRad - ref_.rawHorizontalRad)), 3);
+        Serial.print(", IMU offset [deg] = ");
+        Serial.println(Geometry::radToDeg(Geometry::wrapPi(
+            next.imuMountOffsetRad - ref_.imuMountOffsetRad)), 3);
+    }
+
+    // Flash erase stalls the CPU for ~1-2 s: motor off first.
+    changeState(State::IDLE);
+    Serial.println("[REF] Writing flash (motor off, ~2 s)...");
+
+    if (!storage_.save(next)) {
+        fail("Could not save reference");
+        return;
+    }
+
+    ref_ = next;
+    refValid_ = true;
+    roll_.setMountOffset(ref_.imuMountOffsetRad);
+
+    Serial.println("[REF] Saved and verified.");
+    Serial.println("SHORT press -> calibration + automatic homing (test it now).");
+}
+
+void StateMachine::printReference() {
+    if (!refValid_) {
+        Serial.println("[REF] none stored");
+        return;
+    }
+    Serial.print("[REF] raw beam-horizontal [deg] = ");
+    Serial.print(Geometry::radToDeg(ref_.rawHorizontalRad), 3);
+    Serial.print(", IMU mount offset [deg] = ");
+    Serial.print(Geometry::radToDeg(ref_.imuMountOffsetRad), 3);
+    Serial.print(", taken at [m] = ");
+    Serial.println(ref_.refDistanceM, 3);
 }
 
 // ==========================================
@@ -324,15 +583,24 @@ void StateMachine::finishCalibration() {
 // ==========================================
 
 void StateMachine::beginRun(uint32_t now) {
+    if (!refValid_ || !isfinite(shaftHorizontalRad_)) {
+        Serial.println("No reference stored: save one with 'z' first.");
+        return;
+    }
+
+    if (homing_) {
+        Serial.println("Wait until homing is finished.");
+        return;
+    }
+
     if (!motor_.isActive() ||
         !imu_.isFresh(IMU_TIMEOUT_MS) ||
-        !isfinite(heightM_) ||
         !isfinite(theta0Rad_)) {
         fail("RUN prerequisites missing");
         return;
     }
 
-    float rollRad = roll_.getRelativeRoll();
+    float rollRad = roll_.getLineRoll();
 
     // Confirm alignment only near upright orientation
     if (!isfinite(rollRad) ||
@@ -354,9 +622,10 @@ void StateMachine::beginRun(uint32_t now) {
         return;
     }
 
-    // Capture the mechanically verified optical reference.
-    alignedMotorRad_ = actual;
-    motorTargetRad_ = actual;
+    // RUN reference: world angle theta0 (+ the ALIGN fine trim) at phi = 0.
+    alignedBeamRad_ = theta0Rad_ + alignTrimRad_;
+    alignedMotorRad_ = shaftFromBeam(alignedBeamRad_);
+    motorTargetRad_ = shaftFromBeam(alignedBeamRad_ - rollRad);
 
     motor_.setTarget(motorTargetRad_);
 
@@ -388,7 +657,7 @@ void StateMachine::updateMotor(uint32_t now) {
             return;
         }
 
-        float rollRad = roll_.getRelativeRoll();
+        float rollRad = roll_.getLineRoll();
 
         if (!isfinite(rollRad)) {
             fail("Invalid roll angle");
@@ -403,11 +672,9 @@ void StateMachine::updateMotor(uint32_t now) {
 
         // Outer stabilization loop:
         // IMU -> geometry -> motor angle setpoint
-        float target = Geometry::motorTargetRad(
-            alignedMotorRad_,
-            heightM_,
-            rollRad
-        );
+        // Pure gimbal: hold the world beam angle (theta0 + trim).
+        float alphaTarget = alignedBeamRad_ - rollRad;
+        float target = shaftFromBeam(alphaTarget);
 
         // Synthetic track test ('q'): software sine instead of IMU roll.
         if (trackTest.isSynthetic()) {
@@ -418,7 +685,9 @@ void StateMachine::updateMotor(uint32_t now) {
         float correction = target - alignedMotorRad_;
 
         if (fabsf(correction) >
-            Geometry::degToRad(MAX_MOTOR_DELTA_DEG)) {
+            Geometry::degToRad(MAX_MOTOR_DELTA_DEG) ||
+            beamFromShaft(target) < Geometry::degToRad(BEAM_MIN_DEG) ||
+            beamFromShaft(target) > Geometry::degToRad(BEAM_MAX_DEG)) {
             fail("Target exceeds motor travel range");
             return;
         }
@@ -457,7 +726,7 @@ void StateMachine::updateMotor(uint32_t now) {
                 Serial.print("Tracking error: ");
                 Serial.println(Geometry::radToDeg(trackingError), 2);
 
-                Serial.print("Relative roll: ");
+                Serial.print("Roll phi: ");
                 Serial.println(Geometry::radToDeg(rollRad), 2);
 
                 Serial.print("Error duration [ms]: ");
@@ -481,6 +750,11 @@ void StateMachine::updateMotor(uint32_t now) {
                 return;
             }
         }
+    }
+
+    if (state_ == State::ALIGN) {
+        updateAlignTarget(now);
+        if (state_ == State::ERROR) return;
     }
 
     // Inner position/velocity control is handled by SimpleFOC
@@ -531,16 +805,12 @@ void StateMachine::printStatus(uint32_t now) {
     Serial.print(" state=");
     Serial.print(stateName(state_));
 
-    Serial.print(" roll[deg]=");
-    Serial.print(Geometry::radToDeg(roll_.getRoll()), 2);
+    Serial.print(" rollR[deg]=");
+    Serial.print(Geometry::radToDeg(roll_.getRightRoll()), 2);
 
-    Serial.print(" relativeRoll[deg]=");
-    Serial.print(
-        Geometry::radToDeg(roll_.getRelativeRoll()), 2
-    );
-
-    Serial.print(" height[m]=");
-    Serial.print(heightM_, 3);
+    const float phi = roll_.getLineRoll();
+    Serial.print(" phi[deg]=");
+    Serial.print(Geometry::radToDeg(phi), 2);
 
     if (motor_.isActive()) {
         Serial.print(" motor[deg]=");
@@ -552,6 +822,24 @@ void StateMachine::printStatus(uint32_t now) {
         Serial.print(
             Geometry::radToDeg(motorTargetRad_), 2
         );
+
+        // Diagnostics from the ACTUAL motor angle and roll:
+        // compare D[m] with a tape measure from the pivot.
+        const float alpha = actualBeamRad();
+        Serial.print(" alpha[deg]=");
+        Serial.print(Geometry::radToDeg(alpha), 2);
+        Serial.print(" theta[deg]=");
+        Serial.print(Geometry::radToDeg(alpha + phi), 2);
+        Serial.print(" D[m]=");
+        Serial.print(Geometry::predictedDistanceM(alpha, phi), 3);
+        Serial.print(" trim[deg]=");
+        Serial.print(Geometry::radToDeg(alignTrimRad_), 1);
+
+        if (state_ == State::ALIGN) {
+            Serial.print(homing_ ? " HOMING" :
+                         homed_ ? " HOMED" :
+                         refValid_ ? " HOLD" : " NOREF");
+        }
 
         Serial.print(" Uq[V]=");
         Serial.print(motor_.getVoltageQ(), 2);
@@ -609,8 +897,11 @@ void StateMachine::handleSerial(uint32_t now) {
                 Serial.println("=== COMMANDS ===");
                 Serial.println("s = Show status");
                 Serial.println("m = Toggle monitoring");
-                Serial.println("] = Motor +1 degree");
-                Serial.println("[ = Motor -1 degree");
+                Serial.println("] = Beam 1 deg DOWN (line closer, ALIGN)");
+                Serial.println("[ = Beam 1 deg UP (line further, ALIGN)");
+                Serial.println("z = Save mechanical reference (ALIGN,");
+                Serial.println("    housing level, line on the mark)");
+                Serial.println("p = Print stored reference + geometry");
                 Serial.println("! = Stop motor");
                 Serial.println("r = Track test, summary only (RUN)");
                 Serial.println("R = Track test, summary + CSV (RUN)");
@@ -663,6 +954,24 @@ void StateMachine::handleSerial(uint32_t now) {
             }
 
             // =====================================
+            // MECHANICAL REFERENCE
+            // =====================================
+
+            else if (command == 'z') {
+                saveReference();
+            }
+
+            else if (command == 'p') {
+                printReference();
+                Serial.print("theta0[deg]=");
+                Serial.print(Geometry::radToDeg(theta0Rad_), 3);
+                Serial.print(" mark beam angle[deg]=");
+                Serial.println(Geometry::radToDeg(
+                    Geometry::requiredWorldAngleRad(
+                        0.0f, REFERENCE_DISTANCE_M)), 3);
+            }
+
+            // =====================================
             // MONITOR ON / OFF
             // =====================================
 
@@ -709,16 +1018,10 @@ void StateMachine::handleSerial(uint32_t now) {
                     fminf(limit, alignTrimRad_)
                 );
 
-                motorTargetRad_ =
-                    alignmentBaseRad_ + alignTrimRad_;
-
-                motor_.setTarget(motorTargetRad_);
-
-                Serial.print("[MOTOR] Target = ");
-                Serial.print(
-                    Geometry::radToDeg(motorTargetRad_), 2
-                );
-                Serial.println(" deg");
+                // Applied (slew-limited) by updateAlignTarget().
+                Serial.print("[TRIM] beam trim = ");
+                Serial.print(Geometry::radToDeg(alignTrimRad_), 1);
+                Serial.println(" deg (+ = down)");
             }
 
             else {
@@ -867,7 +1170,7 @@ void StateMachine::update() {
     if (state_ == State::RUN) {
         trackTest.update(
             true,
-            Geometry::radToDeg(roll_.getRelativeRoll()),
+            Geometry::radToDeg(roll_.getLineRoll()),
             Geometry::radToDeg(motorTargetRad_),
             Geometry::radToDeg(motor_.getAngle())
         );

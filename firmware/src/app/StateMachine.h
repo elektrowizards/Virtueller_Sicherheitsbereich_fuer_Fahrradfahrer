@@ -48,11 +48,31 @@ private:
     ButtonHandler button_;
     CalibrationStorage storage_;
 
-    float heightM_ = NAN;
-    float theta0Rad_ = NAN;
-    float alignmentBaseRad_ = NAN;
-    float alignedMotorRad_ = NAN;
-    float alignTrimRad_ = 0.0f;
+    // ---- Mechanical reference (flash) ----
+    bool refValid_ = false;
+    CalibrationStorage::Reference ref_ = {};
+
+    // Valid after initFOC(): shaft angle at which alpha = 0, and
+    // d(shaft)/d(alpha) = sensor_direction * BEAM_ENCODER_SIGN (+/-1).
+    float shaftHorizontalRad_ = NAN;
+    float beamToShaft_ = 1.0f;
+
+    float theta0Rad_ = NAN;          // nominal world beam angle
+
+    // ---- ALIGN ----
+    float alignBaseShaftRad_ = NAN;  // ALIGN goal (shaft), without trim
+    float rampShaftRad_ = NAN;       // slew-limited position toward goal
+    float alignTrimRad_ = 0.0f;      // beam units, + = beam down
+    float alphaGoalRad_ = NAN;       // homing goal (housing frame)
+    bool homing_ = false;
+    bool homed_ = false;
+    uint32_t homingStartMs_ = 0;
+    uint32_t homingTimeoutMs_ = 0;
+    uint32_t lastRampMs_ = 0;
+
+    // ---- RUN ----
+    float alignedBeamRad_ = NAN;     // theta0 + trim (world angle at phi=0)
+    float alignedMotorRad_ = NAN;    // shaft for alignedBeamRad_
     float motorTargetRad_ = 0.0f;
 
     float heightSumM_ = 0.0f;
@@ -77,6 +97,15 @@ private:
     void startCalibration();
     void updateCalibration(uint32_t now);
     void finishCalibration();
+
+    void startHoming(uint32_t now);
+    void updateAlignTarget(uint32_t now);
+    void saveReference();
+    void printReference();
+
+    float shaftFromBeam(float alphaRad) const;
+    float beamFromShaft(float shaftRad) const;
+    float actualBeamRad();
 
     void beginRun(uint32_t now);
     void updateMotor(uint32_t now);

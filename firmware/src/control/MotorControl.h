@@ -38,6 +38,12 @@ public:
     bool isUnstable() const { return unstable_; }
     float getVoltageQ() const { return uq_; }
 
+    // Raw AS5600 single-turn angle [0, 2pi) of the same sample as
+    // getAngle(). Independent of sensor_direction and rotation counting.
+    float getRawAngle();
+    // +1 / -1 as detected by initFOC(): shaft = dir * raw (+ 2pi*turns)
+    int sensorDirection() const { return (int)motor_.sensor_direction; }
+
 private:
     void resetController();
 

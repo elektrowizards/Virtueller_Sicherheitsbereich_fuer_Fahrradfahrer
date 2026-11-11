@@ -33,16 +33,51 @@ constexpr uint8_t AS5600_ADDRESS = 0x36;
 constexpr uint32_t IMU_REPORT_US = 20000; // 50 Hz
 constexpr uint32_t IMU_TIMEOUT_MS = 500;
 
-// Change if sensor mounting reverses the measured roll
+// Sign so that IMU_ROLL_SIGN * (BNO085 roll) is POSITIVE when the
+// housing leans to the RIGHT (seen from behind, in riding direction).
 constexpr float IMU_ROLL_SIGN = 1.0f;
 
 // ======================================
 // STABILIZATION GEOMETRY
 // ======================================
-constexpr float TARGET_DISTANCE_M = 1.50f;
-constexpr float FIXED_HEIGHT_M = 0.80f;
+// Side on which the laser line is projected (seen from behind):
+//   +1 = right, -1 = left.
+// The firmware works with phi = roll TOWARD the line side.
+constexpr float LINE_SIDE = -1.0f;
 
-constexpr float MIN_HEIGHT_M = 0.20f;
+// Lateral distance of the line on the ground, measured from the pivot
+// (bike: tyre contact line, table: tilt edge of the table).
+constexpr float TARGET_DISTANCE_M = 1.50f;
+
+// true  = bench test: device on the table, line on the floor
+// false = on the bike
+constexpr bool TABLE_TEST = true;
+
+// ---- Bike geometry (pivot = tyre contact line, on the ground) ----
+// Laser rotation axis above the tyre contact line, bike upright [m]
+constexpr float BIKE_AXIS_HEIGHT_M = 0.80f;          // FILL IN when mounted
+// Rotation axis lateral offset from the bike centre plane, + = toward line
+constexpr float BIKE_AXIS_OUTWARD_M = 0.0f;
+
+// ---- Table geometry (pivot = table edge over which the line is cast) ----
+constexpr float TABLE_SURFACE_HEIGHT_M = 0.75f;      // FILL IN: measure floor -> table top
+constexpr float AXIS_ABOVE_TABLE_M = 0.060f;         // photo: 60 mm
+// Rotation axis lateral offset from the table edge, + = toward line.
+// Photo: axis 36 mm INSIDE the edge -> negative.
+constexpr float AXIS_OUTWARD_OF_EDGE_M = -0.036f;
+
+// Selected geometry: pivot height above ground (p), rotation axis above
+// pivot (r_up) and toward the line side (r_out), all with housing level.
+constexpr float PIVOT_HEIGHT_M = TABLE_TEST ? TABLE_SURFACE_HEIGHT_M : 0.0f;
+constexpr float AXIS_ABOVE_PIVOT_M = TABLE_TEST ? AXIS_ABOVE_TABLE_M : BIKE_AXIS_HEIGHT_M;
+constexpr float AXIS_OUTWARD_M = TABLE_TEST ? AXIS_OUTWARD_OF_EDGE_M : BIKE_AXIS_OUTWARD_M;
+
+// Perpendicular distance between the beam and the rotation axis
+// (+ = beam passes ABOVE the axis when it points horizontally).
+// An offset ALONG the beam (11.22 mm emitter offset) has no effect.
+constexpr float LASER_BEAM_OFFSET_M = 0.0f;
+
+constexpr float MIN_HEIGHT_M = 0.20f;   // ToF plausibility (ToF bypassed)
 constexpr float MAX_HEIGHT_M = 2.00f;
 
 constexpr float MAX_ROLL_DEG = 30.0f;
@@ -50,8 +85,28 @@ constexpr float MAX_MOTOR_DELTA_DEG = 35.0f;
 constexpr float MAX_ALIGN_TRIM_DEG = 25.0f;
 constexpr float ALIGN_STEP_DEG = 1.0f;
 
-// Motor-direction convention must be verified
-constexpr float MOTOR_ROLL_SIGN = 1.0f;
+// ---- Beam angle / encoder ----
+// alpha = beam angle BELOW horizontal, relative to the housing
+// (+ = pointing down toward the floor).
+// BEAM_ENCODER_SIGN: +1 if an INCREASING raw AS5600 angle tilts the beam
+// DOWN. Defined in the raw sensor frame, so it does not depend on the
+// sensor_direction SimpleFOC detects in initFOC().
+constexpr float BEAM_ENCODER_SIGN = 1.0f;            // verify on the bench
+
+// Mechanical travel of the beam relative to the housing:
+// 12 o'clock (straight up, -90) -> line side -> 6 o'clock (down, +90).
+constexpr float BEAM_MIN_DEG = -90.0f;
+constexpr float BEAM_MAX_DEG = 90.0f;
+
+// ---- Reference ('z') and homing ----
+// Floor mark used for the one-time reference, distance from the pivot.
+constexpr float REFERENCE_DISTANCE_M = TARGET_DISTANCE_M;
+
+constexpr float HOMING_RATE_DEG_S = 60.0f;      // target slew rate
+constexpr float HOMING_MAX_TRAVEL_DEG = 185.0f; // separate from MAX_ALIGN_TRIM_DEG
+constexpr float HOMING_START_MARGIN_DEG = 10.0f;// tolerated beyond BEAM_MIN/MAX at start
+constexpr float HOMED_TOLERANCE_DEG = 1.0f;
+constexpr uint32_t HOMING_SETTLE_MS = 3000;     // added to travel/rate as timeout
 
 // ======================================
 // MOTOR - FIT1035
