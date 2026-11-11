@@ -393,7 +393,7 @@ void StateMachine::finishCalibration() {
     alphaGoalRad_ = NAN;
     homing_ = false;
     homed_ = false;
-    lastRampMs_ = millis();
+    rampClockValid_ = false;
 
     motorTargetRad_ = shaft;
     motor_.setTarget(motorTargetRad_);
@@ -510,7 +510,7 @@ void StateMachine::startHoming(uint32_t now) {
     homing_ = true;
     homed_ = false;
     homingStartMs_ = now;
-    lastRampMs_ = now;
+    rampClockValid_ = false;   // started by updateAlignTarget()
     homingTimeoutMs_ = (uint32_t)(Geometry::radToDeg(travel) /
                                   HOMING_RATE_DEG_S * 1000.0f) +
                        HOMING_SETTLE_MS;
@@ -520,7 +520,17 @@ void StateMachine::startHoming(uint32_t now) {
 
 // Called from updateMotor() in ALIGN every MOTOR_TARGET_PERIOD_MS.
 void StateMachine::updateAlignTarget(uint32_t now) {
-    const float dt = (uint32_t)(now - lastRampMs_) * 0.001f;
+    // 'now' can be older than the timestamps taken inside
+    // finishCalibration() (initFOC blocks for a while). Start the ramp
+    // and homing clocks here, from the same time base as later calls.
+    if (!rampClockValid_) {
+        rampClockValid_ = true;
+        lastRampMs_ = now;
+        homingStartMs_ = now;
+    }
+
+    float dt = (int32_t)(now - lastRampMs_) * 0.001f;
+    if (dt < 0.0f) dt = 0.0f;
     lastRampMs_ = now;
 
     // Slew-rate limited approach of the goal: keeps the position error
@@ -580,6 +590,12 @@ void StateMachine::saveReference() {
     }
     if (!imu_.isFresh(IMU_TIMEOUT_MS) || !roll_.isValid()) {
         Serial.println("[REF] IMU data unavailable.");
+        return;
+    }
+    // The line must be visible and on the mark: refuse with laser off.
+    if (!laser_.isEmitting()) {
+        Serial.println("[REF] Refused: laser is OFF, so the line cannot be on the mark.");
+        Serial.println("      Send 'l', trim the line onto the mark, then 'z'.");
         return;
     }
 

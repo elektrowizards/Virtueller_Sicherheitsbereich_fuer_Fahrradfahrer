@@ -114,7 +114,7 @@ constexpr float REFERENCE_DISTANCE_M = TARGET_DISTANCE_M;
 
 constexpr float HOMING_RATE_DEG_S = 60.0f;      // target slew rate
 constexpr float HOMING_MAX_TRAVEL_DEG = 185.0f; // separate from MAX_ALIGN_TRIM_DEG
-constexpr float HOMING_START_MARGIN_DEG = 10.0f;// tolerated beyond BEAM_MIN/MAX at start
+constexpr float HOMING_START_MARGIN_DEG = 45.0f;// tolerated beyond BEAM_MIN/MAX at start
 constexpr float HOMED_TOLERANCE_DEG = 1.0f;
 constexpr uint32_t HOMING_SETTLE_MS = 3000;     // added to travel/rate as timeout
 
