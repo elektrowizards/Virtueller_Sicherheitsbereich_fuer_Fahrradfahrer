@@ -896,6 +896,14 @@ void StateMachine::updateLEDs(uint32_t now) {
     bool red = false;
 
     switch (state_) {
+        case State::IDLE:
+            // Fast 4 Hz blink = ready: a SHORT press starts calibration.
+            // Off while the IMU has no fresh data (press would be refused);
+            // a frozen main loop also stops the blinking.
+            blue = imu_.isFresh(IMU_TIMEOUT_MS) &&
+                   (now / 125u) % 2u == 0u;
+            break;
+
         case State::CALIBRATION:
             blue = (now / 250u) % 2u == 0u; // 2 Hz
             break;
