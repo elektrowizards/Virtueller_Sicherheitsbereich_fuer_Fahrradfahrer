@@ -78,6 +78,10 @@ private:
     // initFOC() blocks for 1-2 s without IMU polling: homing waits for
     // fresh IMU data before it starts.
     bool homingPending_ = false;
+
+    // Main-loop stall diagnostic; 0 = skip the next check (after the
+    // intentionally blocking initFOC() and flash write).
+    uint32_t lastLoopMs_ = 0;
     uint32_t homingPendingSinceMs_ = 0;
 
     // ---- RUN ----

@@ -418,8 +418,10 @@ void StateMachine::finishCalibration() {
         // Started from updateAlignTarget() once the IMU is fresh again.
         homingPending_ = true;
         homingPendingSinceMs_ = millis();
+        lastLoopMs_ = 0;   // initFOC() blocked on purpose
         Serial.println("HOMING: waiting for fresh IMU data...");
     } else {
+        lastLoopMs_ = 0;   // initFOC() blocked on purpose
         Serial.println("NO REFERENCE STORED - homing refused.");
         Serial.println("One-time reference: housing LEVEL on the table,");
         Serial.print("trim with '[' (beam up) / ']' (beam down) until the line hits the mark at ");
@@ -546,8 +548,18 @@ void StateMachine::updateAlignTarget(uint32_t now) {
         }
     }
 
+    // While waiting for the IMU: hold, and do not evaluate "HOMED".
+    if (homingPending_) {
+        lastRampMs_ = now;
+        motorTargetRad_ = rampShaftRad_ + beamToShaft_ * alignTrimRad_;
+        return;
+    }
+
+    // dt is clamped, so a stalled main loop can never let the ramp jump
+    // (the slew limit then just slows down).
     float dt = (int32_t)(now - lastRampMs_) * 0.001f;
     if (dt < 0.0f) dt = 0.0f;
+    if (dt > 0.02f) dt = 0.02f;
     lastRampMs_ = now;
 
     // Slew-rate limited approach of the goal: keeps the position error
@@ -670,6 +682,7 @@ void StateMachine::saveReference() {
     refValid_ = true;
     roll_.setMountOffset(ref_.imuMountOffsetRad);
 
+    lastLoopMs_ = 0;   // flash write blocked on purpose
     Serial.println("[REF] Saved and verified.");
     Serial.println("SHORT press -> calibration + automatic homing (test it now).");
 }
@@ -1225,6 +1238,15 @@ void StateMachine::update() {
 
     uint32_t now = millis();
 
+    // Diagnostic: report any main-loop stall (whatever caused it).
+    if (lastLoopMs_ != 0 && (uint32_t)(now - lastLoopMs_) >= 100) {
+        Serial.print("[WARN] main loop stalled for ");
+        Serial.print(now - lastLoopMs_);
+        Serial.print(" ms in ");
+        Serial.println(stateName(state_));
+    }
+    lastLoopMs_ = now;
+
     // ==========================================
     // 1. BUTTON HANDLING
     // ==========================================
@@ -1266,8 +1288,18 @@ void StateMachine::update() {
 
         lastImuPollMs_ = now;
 
+        const uint32_t imuStartMs = millis();
         if (imu_.update()) {
             roll_.update(imu_.getRoll());
+        }
+
+        // Diagnostic: report IMU reads that block the main loop
+        // (button, motor control and serial all stop meanwhile).
+        const uint32_t imuMs = millis() - imuStartMs;
+        if (imuMs >= 50) {
+            Serial.print("[WARN] IMU read blocked the main loop for ");
+            Serial.print(imuMs);
+            Serial.println(" ms");
         }
 
         // Check communication health
