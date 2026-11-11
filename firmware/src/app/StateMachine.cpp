@@ -201,11 +201,22 @@ void StateMachine::handleButton(
 ) {
     if (event == ButtonEvent::NONE) return;
 
+    // Every press is reported, including the ones a state ignores.
+    const char* evName =
+        event == ButtonEvent::SHORT_PRESS  ? "SHORT" :
+        event == ButtonEvent::DOUBLE_PRESS ? "DOUBLE" : "LONG";
+    Serial.print("[BTN] ");
+    Serial.print(evName);
+    Serial.print(" press in ");
+    Serial.println(stateName(state_));
+
     switch (state_) {
 
         case State::IDLE:
             if (event == ButtonEvent::SHORT_PRESS)
                 startCalibration();
+            else
+                Serial.println("[BTN] ignored in IDLE: use a SHORT press (< 1.4 s)");
             break;
 
         case State::CALIBRATION:
@@ -219,6 +230,9 @@ void StateMachine::handleButton(
 
             if (event == ButtonEvent::LONG_PRESS)
                 changeState(State::IDLE);
+
+            if (event == ButtonEvent::SHORT_PRESS)
+                Serial.println("[BTN] ignored in ALIGN: DOUBLE = RUN, LONG = IDLE");
             break;
 
         case State::RUN:
@@ -228,6 +242,9 @@ void StateMachine::handleButton(
             break;
 
         case State::ERROR:
+            if (event != ButtonEvent::LONG_PRESS) {
+                Serial.println("[BTN] ERROR: LONG press resets the board");
+            }
             if (event == ButtonEvent::LONG_PRESS) {
                 motor_.stop();
                 laser_.off();
@@ -1158,6 +1175,9 @@ void StateMachine::update() {
 
     ButtonEvent event = button_.update(
         now,
+        // IDLE has no double-press meaning, so a short press fires on
+        // release instead of after the 350 ms double-press window.
+        state_ == State::IDLE ||
         state_ == State::RUN ||
         state_ == State::CALIBRATION
     );
