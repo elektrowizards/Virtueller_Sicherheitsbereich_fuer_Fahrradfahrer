@@ -1246,6 +1246,15 @@ void StateMachine::update() {
 
     uint32_t now = millis();
 
+    // Boot diagnostics: show that the main loop runs and where it would
+    // hang (the first IMU reads are bracketed below).
+    static uint8_t s_bootReads = 0;
+    static bool s_loopStarted = false;
+    if (!s_loopStarted) {
+        s_loopStarted = true;
+        Serial.println("[DBG] main loop started");
+    }
+
     // Diagnostic: report any main-loop stall (whatever caused it).
     if (lastLoopMs_ != 0 && (uint32_t)(now - lastLoopMs_) >= 100) {
         Serial.print("[WARN] main loop stalled for ");
@@ -1297,8 +1306,20 @@ void StateMachine::update() {
         lastImuPollMs_ = now;
 
         const uint32_t imuStartMs = millis();
+        if (s_bootReads < 3) {
+            Serial.print("[DBG] IMU read ");
+            Serial.print(s_bootReads + 1);
+            Serial.print(" start... ");
+            Serial.flush();   // make sure it is out before a possible hang
+        }
         if (imu_.update()) {
             roll_.update(imu_.getRoll());
+        }
+        if (s_bootReads < 3) {
+            Serial.print("done in ");
+            Serial.print(millis() - imuStartMs);
+            Serial.println(" ms");
+            s_bootReads++;
         }
 
         // Diagnostic: report IMU reads that block the main loop
