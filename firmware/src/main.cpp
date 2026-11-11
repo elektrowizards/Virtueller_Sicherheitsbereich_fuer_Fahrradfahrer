@@ -1,25 +1,47 @@
 #include <Arduino.h>
 
+#include "config.h"
 #include "app/StateMachine.h"
 
+// Main application object. It owns all drivers, including the laser.
+StateMachine application;
+
 // ==========================================
-// BACHELORARBEIT
-// Bicycle Laser Stabilization System
-// NUCLEO-F446RE
+// RESET CAUSE (STM32 RCC->CSR flags)
+// Prints why the board started, then clears the flags.
+// Order matters: a power-on also sets PIN and BOR.
 // ==========================================
 
-// Main application object
-StateMachine application;
+static void printResetCause() {
+    const uint32_t csr = RCC->CSR;
+
+    Serial.print("Reset cause: ");
+
+    if (csr & RCC_CSR_PORRSTF)       Serial.println("POWER-ON (board was unpowered)");
+    else if (csr & RCC_CSR_BORRSTF)  Serial.println("BROWN-OUT (supply voltage dipped!)");
+    else if (csr & RCC_CSR_IWDGRSTF) Serial.println("INDEPENDENT WATCHDOG");
+    else if (csr & RCC_CSR_WWDGRSTF) Serial.println("WINDOW WATCHDOG");
+    else if (csr & RCC_CSR_SFTRSTF)  Serial.println("SOFTWARE (NVIC_SystemReset / upload)");
+    else if (csr & RCC_CSR_LPWRRSTF) Serial.println("LOW-POWER");
+    else if (csr & RCC_CSR_PINRSTF)  Serial.println("RESET PIN (button or ST-LINK)");
+    else                             Serial.println("unknown");
+
+    RCC->CSR |= RCC_CSR_RMVF;   // clear flags for the next reset
+}
 
 // ==========================================
 // SETUP
 // ==========================================
 
 void setup() {
+    // Laser output LOW before anything else (the gate/base pull-down
+    // already holds it off during reset). StateMachine::begin()
+    // takes over the pin later through LaserDriver.
+    pinMode(LASER_PIN, OUTPUT);
+    digitalWrite(LASER_PIN, LOW);
 
-    // Initialize serial communication
     Serial.begin(115200);
-    delay(500);
+    delay(300);   // give the serial monitor time to connect
 
     Serial.println();
     Serial.println("================================");
@@ -27,27 +49,22 @@ void setup() {
     Serial.println(" NUCLEO-F446RE / SimpleFOC");
     Serial.println("================================");
 
+    printResetCause();
+
+    Serial.print("Laser pin: PB0 (A3), ");
+    Serial.println(LASER_ENABLED ? "enabled in ALIGN/RUN" : "DISABLED (LASER_ENABLED=false)");
+
     Serial.println("Starting complete system...");
     Serial.println();
 
-    // Initialize complete application:
-    // - I2C bus
-    // - BNO085 IMU
-    // - VL53L8CX ToF
-    // - AS5600 encoder
-    // - FIT1035 motor + DRI0058 driver
-    // - Button and LEDs
-    // - State machine
     application.begin();
 }
 
 // ==========================================
-// MAIN LOOP
+// LOOP
 // ==========================================
 
 void loop() {
-
-    // Execute application state machine
-    // and associated control functions
+    // Never add delay() here: the FOC loop runs inside update().
     application.update();
 }

@@ -32,6 +32,15 @@ const char* StateMachine::stateName(State s) const {
     return "UNKNOWN";
 }
 
+const char* StateMachine::laserName() const {
+    if (laser_.isLocked()) return "LOCKED";
+    switch (laser_.mode()) {
+        case LaserDriver::Mode::On:    return "ON";
+        case LaserDriver::Mode::Blink: return "BLINK";
+        default:                       return "OFF";
+    }
+}
+
 // ==========================================
 // STATE TRANSITIONS
 // ==========================================
@@ -42,8 +51,9 @@ void StateMachine::changeState(State next) {
         tof_.stop();
     }
 
-    // No laser emission in this bench prototype.
-    digitalWrite(LASER_PIN, LOW);
+    // Laser off on every transition; applyLaserForState()
+    // switches it on again only for ALIGN and RUN.
+    laser_.off();
 
     if (next == State::IDLE || next == State::ERROR) {
         motor_.stop();
@@ -55,16 +65,39 @@ void StateMachine::changeState(State next) {
     }
 
     state_ = next;
+    applyLaserForState();
 
     Serial.print("STATE -> ");
-    Serial.println(stateName(state_));
+    Serial.print(stateName(state_));
+    Serial.print("  laser=");
+    Serial.println(laserName());
+}
+
+// ALIGN: laser on, so the line can be aimed at the target distance,
+//        but OFF while homing (the beam may sweep up through the room).
+// RUN:   laser on while stabilizing.
+// All other states: off. In ERROR the laser is also locked.
+void StateMachine::applyLaserForState() {
+    switch (state_) {
+        case State::ALIGN:
+            if (homing_) laser_.off();
+            else laser_.on();   // ignored while locked
+            break;
+        case State::RUN:
+            laser_.on();    // ignored while locked
+            break;
+        default:
+            laser_.off();
+            break;
+    }
 }
 
 void StateMachine::fail(const char* message) {
     faultText_ = message;
 
-    // Disable outputs before printing.
-    digitalWrite(LASER_PIN, LOW);
+    // Disable outputs before printing. The lock keeps the laser
+    // off until reset (ERROR is only left via NVIC_SystemReset).
+    laser_.setLocked(true);
     motor_.stop();
 
     changeState(State::ERROR);
@@ -78,14 +111,18 @@ void StateMachine::fail(const char* message) {
 // ==========================================
 
 void StateMachine::begin() {
+    // Laser first: output LOW before anything slow happens.
+    laser_.begin();
+    if (!LASER_ENABLED) {
+        laser_.setLocked(true);
+    }
+
     pinMode(RED_LED_PIN, OUTPUT);
     pinMode(BLUE_LED_PIN, OUTPUT);
-    pinMode(LASER_PIN, OUTPUT);
     pinMode(MOTOR_ENABLE, OUTPUT);
 
     digitalWrite(RED_LED_PIN, LOW);
     digitalWrite(BLUE_LED_PIN, LOW);
-    digitalWrite(LASER_PIN, LOW);
     digitalWrite(MOTOR_ENABLE, LOW);
 
     button_.begin();
@@ -193,7 +230,7 @@ void StateMachine::handleButton(
         case State::ERROR:
             if (event == ButtonEvent::LONG_PRESS) {
                 motor_.stop();
-                digitalWrite(LASER_PIN, LOW);
+                laser_.off();
                 NVIC_SystemReset();
             }
             break;
@@ -217,7 +254,7 @@ void StateMachine::startCalibration() {
 
     // Safety: disable motor and laser
     motor_.stop();
-    digitalWrite(LASER_PIN, LOW);
+    laser_.off();
 
     // ToF bypassed: geometry comes from config.h
     heightSumM_ = 0.0f;
@@ -349,7 +386,13 @@ void StateMachine::finishCalibration() {
     Serial.print(", raw encoder [deg] = ");
     Serial.println(Geometry::radToDeg(raw), 2);
 
+    // With a reference, homing starts right away: keep the laser off
+    // through the state change (applyLaserForState checks homing_).
+    homing_ = refValid_;
     changeState(State::ALIGN);
+
+    Serial.print("ALIGN: laser ");
+    Serial.println(laserName());
 
     if (refValid_) {
         startHoming(millis());
@@ -391,6 +434,10 @@ float StateMachine::actualBeamRad() {
 }
 
 void StateMachine::startHoming(uint32_t now) {
+    // On refusal the laser stays as it is (off when called from
+    // finishCalibration); 'l' can switch it on for manual trimming.
+    homing_ = false;
+
     const float alphaNow = actualBeamRad();
     const float phi = roll_.getLineRoll();
 
@@ -450,6 +497,8 @@ void StateMachine::startHoming(uint32_t now) {
     homingTimeoutMs_ = (uint32_t)(Geometry::radToDeg(travel) /
                                   HOMING_RATE_DEG_S * 1000.0f) +
                        HOMING_SETTLE_MS;
+
+    applyLaserForState();   // laser off until HOMED
 }
 
 // Called from updateMotor() in ALIGN every MOTOR_TARGET_PERIOD_MS.
@@ -476,6 +525,7 @@ void StateMachine::updateAlignTarget(uint32_t now) {
 
         homing_ = false;
         homed_ = true;
+        applyLaserForState();   // laser back on (unless locked)
 
         const float alpha = actualBeamRad();
         const float phi = roll_.getLineRoll();
@@ -642,9 +692,10 @@ void StateMachine::beginRun(uint32_t now) {
     lastEncoderCheckMs_ = now;
 
     changeState(State::RUN);
-    Serial.println(RUN_HOLD_DISTANCE
-        ? "STABILIZATION ACTIVE (line distance hold) - LASER OFF"
-        : "STABILIZATION ACTIVE (beam angle hold) - LASER OFF");
+    Serial.print(RUN_HOLD_DISTANCE
+        ? "STABILIZATION ACTIVE (line distance hold) - LASER "
+        : "STABILIZATION ACTIVE (beam angle hold) - LASER ");
+    Serial.println(laserName());
 }
 
 // ==========================================
@@ -824,6 +875,9 @@ void StateMachine::printStatus(uint32_t now) {
     Serial.print(" phi[deg]=");
     Serial.print(Geometry::radToDeg(phi), 2);
 
+    Serial.print(" laser=");
+    Serial.print(laserName());
+
     if (motor_.isActive()) {
         Serial.print(" motor[deg]=");
         Serial.print(
@@ -921,6 +975,7 @@ void StateMachine::handleSerial(uint32_t now) {
                 Serial.println("Q = Synthetic track test + CSV (RUN)");
                 Serial.println("x = Abort track test");
                 Serial.println("i = Toggle I2C clock 100k/400k");
+                Serial.println("l = Toggle laser (ALIGN/RUN)");
             }
 
             // =====================================
@@ -954,6 +1009,23 @@ void StateMachine::handleSerial(uint32_t now) {
                     bus_.getWire().setClock(s_i2cHz);
                     Serial.print("[I2C] Clock [Hz] = ");
                     Serial.println(s_i2cHz);
+                }
+            }
+
+            // =====================================
+            // LASER ON / OFF
+            // =====================================
+
+            else if (command == 'l') {
+                if (laser_.isLocked()) {
+                    Serial.println("[LASER] Locked (fault or LASER_ENABLED=false)");
+                } else if (state_ == State::ALIGN ||
+                           state_ == State::RUN) {
+                    laser_.toggle();
+                    Serial.print("[LASER] ");
+                    Serial.println(laserName());
+                } else {
+                    Serial.println("[LASER] Only available in ALIGN or RUN");
                 }
             }
 
@@ -1093,6 +1165,7 @@ void StateMachine::update() {
     handleSerial(now);
     handleButton(event, now);
     updateLEDs(now);
+    laser_.update();    // only does work in blink mode
 
     if (state_ == State::ERROR) {
         return;

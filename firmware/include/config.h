@@ -21,8 +21,13 @@ constexpr uint32_t I2C_SDA_PIN = D14;   // PB9
 constexpr uint32_t I2C_SCL_PIN = D15;   // PB8
 constexpr uint32_t I2C_FREQUENCY = 50000;
 
-// Reserved laser pin: ALWAYS OFF for bench testing
-constexpr uint32_t LASER_PIN = D4;
+// Laser: low-side switch (NPN on prototype, AO3400A on PCB), HIGH = on.
+// Use PB0 directly: A3 maps to PB0 on the Nucleo, but not necessarily
+// in the generic STM32F446RE variant used for the custom PCB.
+constexpr uint32_t LASER_PIN = PB0;     // Nucleo A3
+
+// false = laser stays off in every state (bench testing without laser)
+constexpr bool LASER_ENABLED = true;
 
 // ======================================
 // SENSOR SETTINGS
@@ -61,7 +66,7 @@ constexpr float BIKE_AXIS_OUTWARD_M = 0.0f;
 
 // ---- Table geometry (pivot = table edge over which the line is cast) ----
 constexpr float TABLE_SURFACE_HEIGHT_M = 0.75f;      // FILL IN: measure floor -> table top
-constexpr float AXIS_ABOVE_TABLE_M = 0.060f;         // photo: 60 mm
+constexpr float AXIS_ABOVE_TABLE_M = 0.060f;         // photo: 60 mm (older local config said 0.0307 - CHECK)
 // Rotation axis lateral offset from the table edge, + = toward line.
 // Photo: axis 36 mm INSIDE the edge -> negative.
 constexpr float AXIS_OUTWARD_OF_EDGE_M = -0.036f;

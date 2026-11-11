@@ -1,0 +1,63 @@
+Bill Of Material ,,,,,,,,,
+,,,,,,,,,
+Item #,Designator,Footprint,Type,Qty,Designation,Manufacturer,MPN,Description,Link
+1,C1,C_0805_2012Metric,SMD,1,22u,"Samsung Electro-Mechanics 
+",CL21X226MAYNNWE,"Multilayer Ceramic Capacitors MLCC - SMD/SMT 22uF X6S +/-20% 25V 0805 
+",https://www.mouser.de/en/ProductDetail/Samsung-Electro-Mechanics/CL21X226MAYNNWE?qs=ST9lo4GX8V2B80Jx6lkQ1Q%3D%3D
+2,C2,C_0805_2012Metric,SMD,1,4.7u,KEMET ,C0805C475K3RAC7210 , Multilayer Ceramic Capacitors MLCC - SMD/SMT 25V 4.7uF X7R 0805 10% ,https://www.mouser.de/en/ProductDetail/KEMET/C0805C475K3RAC7210?qs=%252B6g0mu59x7Lqd%252BVqCWvTyg%3D%3D
+3,"C3, C10",C_0603_1608Metric,SMD,2,10u,KYOCERA AVX ,KGM15CR51E106KT ,Multilayer Ceramic Capacitors MLCC - SMD/SMT 25V 10uF X5R 0603 10 % ,https://www.mouser.de/en/ProductDetail/KYOCERA-AVX/KGM15CR51E106KT?qs=Jm2GQyTW%2FbivGePmWDvPHQ%3D%3D
+4,"C4, C5, C6, C7, C8, C13, C14",C_0402_1005Metric,SMD,7,100nf,"Samsung Electro-Mechanics 
+",CL05B104KBD6PJC ,"Multilayer Ceramic Capacitors MLCC - SMD/SMT 0402/1005,100nF,X7R,50V,+/-10% ",https://www.mouser.de/en/ProductDetail/Samsung-Electro-Mechanics/CL05B104KBD6PJC?qs=IKkN%2F947nfBly2tiNxXPvA%3D%3D
+5,C9,C_0603_1608Metric,SMD,1,100n,KEMET ,C0603C104K5RACTU ,Multilayer Ceramic Capacitors MLCC - SMD/SMT 50V 0.1uF X7R 0603 10%,https://www.mouser.de/en/ProductDetail/KEMET/C0603C104K5RACTU?qs=l5k%252BbMnNDkkVcnZPSAaaiQ%3D%3D
+6,"C11, C12",C_0402_1005Metric,SMD,2,1u,Murata Electronics ,"GRM155R61E105KE11D 
+
+",Multilayer Ceramic Capacitors MLCC - SMD/SMT 1 uF 25 VDC 10% 0402 X5R ,https://www.mouser.de/en/ProductDetail/Murata-Electronics/GRM155R61E105KE11D?qs=QzBtWTOodeUQ00WJlpqFiw%3D%3D
+7,C15,C_0805_2012Metric,SMD,1,100n,KEMET ,C0805R104J5RACTU ,Multilayer Ceramic Capacitors MLCC - SMD/SMT 50V 0.1uF X7R 0805 5% Flex Soft ,https://www.mouser.co.uk/en/ProductDetail/KEMET/C0805R104J5RACTU?qs=RcG8xmE7yp2JeihV4l474Q%3D%3D&srsltid=AYCX9vJ_4DoeVIyRm3DvkiyQlqviafJXwgesSadurbOiA7lF4aHCtj1N
+8,"C16, C17",C_0402_1005Metric,SMD,2,10p,KEMET , C0402C100C5GACAUTO , Multilayer Ceramic Capacitors MLCC - SMD/SMT 50V 10pF C0G 0402 0.25pF AEC-Q200 ,https://www.mouser.com/ProductDetail/KEMET/C0402C100C5GACAUTO?qs=jI8Gez59nxIdSgXSmqmKxg%3D%3D&srsltid=AYCX9vISeN76i5_rRGce-fP0RmInCEja_4BR4jp6EiDsYxRMJ2wb80V_
+9,C18,CP_Radial_D6.3mm_P2.50mm,thru-hole,1,100u,KEMET , ESC107M035AE3AA , Aluminium Electrolytic Capacitors - Radial Leaded 35V 100uF 105C 2k Hour Radial ,https://www.mouser.de/en/ProductDetail/KEMET/ESC107M035AE3AA?qs=F5EMLAvA7IA7q%2FLtm4zOMg%3D%3D
+10,C19,C_0402_1005Metric,SMD,1,4.7u,Samsung Electro-Mechanics,CL05A475MP7NRB8 , Multilayer Ceramic Capacitors MLCC - SMD/SMT 4.7uF+/-20% 10V X5R 0402 ,https://www.mouser.de/en/ProductDetail/Samsung-Electro-Mechanics/CL05A475MP7NRB8?qs=xZ%2FP%252Ba9zWqbM83sZpdBqnA%3D%3D
+11,"D1, D2",D_SMA,SMD,2,D_Schottky,Diodes Incorporated ,B360AE-13 ,Schottky Diodes & Rectifiers Schottky Rectifier ,https://www.mouser.de/en/ProductDetail/Diodes-Incorporated/B360AE-13?qs=AQlKX63v8Rv%2FeJGIZGikNw%3D%3D
+12,D3,D_DO-201AD_P15.24mm_Horizontal,thru-hole,1,SB5H90,Vishay Semiconductors , SB5H90-E3/54 , Schottky Diodes & Rectifiers 90 Volt 5.0 Amp 200 Amp IFSM ,https://www.mouser.de/en/ProductDetail/Vishay-Semiconductors/SB5H90-E3-54?qs=u91jd7aysvMgyhkyGD9KnQ%3D%3D&srsltid=AYCX9vJGvz9pUfqOcSahHODNpfyWoHMUIFW3OJeZ8rSmFX8bFv8wYdla
+13,F1,Fuse_Bourns_MF-RHT200,thru-hole,1,Polyfuse,Bourns , MF-RHT200-0 , Resettable Fuses - PPTC PTC 2.0A 16V RADIAL LEADED HI-TEMP ,https://www.mouser.de/en/ProductDetail/Bourns/MF-RHT200-0?qs=GvnsgvzI0l%252BrujObGCc1Rg%3D%3D
+14,FB1,L_0603_1608Metric,SMD,1,120R,Eaton Electronics , MFBW1V1608-121-R , Ferrite Beads 120 OHM 1.0A ,https://www.mouser.de/en/ProductDetail/Eaton-Electronics/MFBW1V1608-121-R?qs=W%2FMpXkg%252BdQ6g%2Felrnv6d2w%3D%3D
+15,J1,JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical,thru-hole,1,Taster,JST Commercial ,B2B-PH-K-S(LF)(SN) ,Headers & Wire Housings PH SHROUDED HEADER ,https://www.mouser.de/en/ProductDetail/JST-Commercial/B2B-PH-K-SLFSN?qs=cdbOS8ANM9AlozzPlOt72g%3D%3D
+16,J2,JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical,thru-hole,1,Green_LED,JST Commercial ,B2B-PH-K-S(LF)(SN) ,Headers & Wire Housings PH SHROUDED HEADER ,https://www.mouser.de/en/ProductDetail/JST-Commercial/B2B-PH-K-SLFSN?qs=cdbOS8ANM9AlozzPlOt72g%3D%3D
+17,J3,JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical,thru-hole,1,Blue_LED,JST Commercial ,B2B-PH-K-S(LF)(SN) ,Headers & Wire Housings PH SHROUDED HEADER ,https://www.mouser.de/en/ProductDetail/JST-Commercial/B2B-PH-K-SLFSN?qs=cdbOS8ANM9AlozzPlOt72g%3D%3D
+18,J4,JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical,thru-hole,1,Red_LED,JST Commercial ,B2B-PH-K-S(LF)(SN) ,Headers & Wire Housings PH SHROUDED HEADER ,https://www.mouser.de/en/ProductDetail/JST-Commercial/B2B-PH-K-SLFSN?qs=cdbOS8ANM9AlozzPlOt72g%3D%3D
+19,J5,JST_PH_B5B-PH-K_1x05_P2.00mm_Vertical,thru-hole,1,ToF_pins,JST Commercial ,B5B-PH-K-S(LF)(SN), Headers & Wire Housings PH HEADER (TOP) ,https://www.mouser.de/en/ProductDetail/JST-Commercial/B5B-PH-K-SLFSN?qs=cdbOS8ANM9D3wzLpMXTqRQ%3D%3D
+20,J6,JST_PH_B6B-PH-K_1x06_P2.00mm_Vertical,thru-hole,1,IMU_pins,JST Commercial ,B6B-PH-K-S(LF)(SN), Headers & Wire Housings PA HEADER (TOP) ,https://www.mouser.de/en/ProductDetail/JST-Commercial/B6B-PH-K-SLFSN?qs=cdbOS8ANM9A0lhuIVD3l8Q%3D%3D
+21,J7,PinHeader_1x04_P2.54mm_Vertical,DNS,1,Encoder_pins,,,,
+22,J8,PinHeader_1x05_P2.54mm_Vertical,DNS,1,SWD_pins,,,,
+23,J9,JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical,thru-hole,1,Laser_pins,JST Commercial ,B2B-PH-K-S(LF)(SN) ,Headers & Wire Housings PH SHROUDED HEADER ,https://www.mouser.de/en/ProductDetail/JST-Commercial/B2B-PH-K-SLFSN?qs=cdbOS8ANM9AlozzPlOt72g%3D%3D
+24,J10,PinHeader_1x07_P2.54mm_Vertical,DNS,1,Add-ons,,,,
+25,J11,JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical,thru-hole,1,Akku_pins,JST Commercial ,B2B-PH-K-S(LF)(SN) ,Headers & Wire Housings PH SHROUDED HEADER ,https://www.mouser.de/en/ProductDetail/JST-Commercial/B2B-PH-K-SLFSN?qs=cdbOS8ANM9AlozzPlOt72g%3D%3D
+26,J12,JST_PH_B2B-PH-K_1x02_P2.00mm_Vertical,thru-hole,1,PowerTaster_pins,JST Commercial ,B2B-PH-K-S(LF)(SN) ,Headers & Wire Housings PH SHROUDED HEADER ,https://www.mouser.de/en/ProductDetail/JST-Commercial/B2B-PH-K-SLFSN?qs=cdbOS8ANM9AlozzPlOt72g%3D%3D
+27,J13,USB_Micro-B_Wuerth_629105150521,SMD,1,USB_B_Micro,Wurth Elektronik ,629105150521,USB Connectors WR-COM USB Micro SMT Type B Horiztl ,https://www.mouser.de/en/ProductDetail/Wurth-Elektronik/629105150521?qs=a9WhcLg8qCzXiH7kZP8GRQ%3D%3D
+28,Q1,SOT-23,SMD,1,AO3400A,Alpha & Omega Semiconductor,AO3400A,The AO3400A combines advanced trench MOSFET technology with a low impedance package to provide ultra-low RDS(ON). This device is suitable for use as a load switch or in PWM applications.,https://www.reichelt.com/de/en/shop/product/mosfet_n-ch_30v_5_7a_0_018r_sot-23-166490
+29,"R1, R5, R7",R_0402_1005Metric,SMD,3,10k,Panasonic, ERA2AEB103X,Metal film precision chip resistor,https://www.reichelt.com/de/en/shop/product/smd_chip_resistor_0402_10_0_kohms_0_1_-123025
+30,"R2, R3, R4",R_0402_1005Metric,SMD,3,330,Kamaya, RMC1/16S-331JTH , Thick Film Resistors 0402 330R 5% ,https://www.mouser.de/en/ProductDetail/Kamaya/RMC1-16S-331JTH?qs=sGAEpiMZZMvdGkrng054t7UQjkT0ebsmCdJBqcpqkshz6b6hIi8qbA%3D%3D
+31,R6,R_0402_1005Metric,SMD,1,39k,Kamaya, RMC10K3902FTH , Thick Film Resistors 39 KOhms 1% 0.5A AEC-Q200 ,https://www.mouser.de/en/ProductDetail/Kamaya/RMC10K3902FTH?qs=sGAEpiMZZMvdGkrng054twq3eZrCFN89VRyuiC%2FNyHot9gGEb1idFw%3D%3D
+32,"R8, R9, R12, R13",R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal,DNS,4,4k7,,,,
+33,R10,R_0402_1005Metric,SMD,1,100,Kamaya, RMC1/16S-101JTH , Thick Film Resistors 0402 100R 5% ,https://www.mouser.de/en/ProductDetail/Kamaya/RMC1-16S-101JTH?qs=sGAEpiMZZMvdGkrng054t7UQjkT0ebsmwf85xjI48hUbnh91KJMi%2FQ%3D%3D
+34,R11,R_0402_1005Metric,SMD,1,100k,Kamaya, RMC1/16S-104JTH , Thick Film Resistors 0402 100K 5% ,https://www.mouser.de/en/ProductDetail/Kamaya/RMC1-16S-104JTH?qs=sGAEpiMZZMvdGkrng054t7UQjkT0ebsmv3eey4ZcbO9%252BUb6xwa6oOQ%3D%3D
+35,R14,R_0402_1005Metric,SMD,1,1k5,Kamaya ,RMC10K152FTH , Thick Film Resistors 1.5 kOhms 1% 0.5A AEC-Q200 ,https://www.mouser.de/en/ProductDetail/Kamaya/RMC10K152FTH?qs=sGAEpiMZZMvdGkrng054twq3eZrCFN89e1Aj%252BNY1G1dkYJmeQ0fZDg%3D%3D
+36,SW1,SW_SPDT_PCM12,SMD,1,SW_SPDT,C&K ,PCM12SMTR , Slide Switches 0.3A SPDT ON-ON ,https://www.mouser.de/en/ProductDetail/CK/PCM12SMTR?qs=mfFuHy8STfL3qrPSfCHA7w%3D%3D
+37,TP1,TestPoint_Keystone_5000-5004_Miniature,DNS,1,+5V,,,,
+38,TP2,TestPoint_Keystone_5000-5004_Miniature,DNS,1,+3V3,,,,
+39,TP3,TestPoint_Keystone_5000-5004_Miniature,DNS,1,+3V3A,,,,
+40,TP4,TestPoint_Keystone_5000-5004_Miniature,DNS,1,+VDC,,,,
+41,TP5,TestPoint_Keystone_5000-5004_Miniature,DNS,1,+5_SYS,,,,
+42,TP6,TestPoint_Keystone_5000-5004_Miniature,DNS,1,I2C2_SCL,,,,
+43,TP7,TestPoint_Keystone_5000-5004_Miniature,DNS,1,I2C2_SDA,,,,
+44,TP8,TestPoint_Keystone_5000-5004_Miniature,DNS,1,I2C1_SCL,,,,
+45,TP9,TestPoint_Keystone_5000-5004_Miniature,DNS,1,I2C1_SDA,,,,
+46,TP15,TestPoint_Keystone_5000-5004_Miniature,DNS,1,AKKU_MOT,,,,
+47,"TP16, TP17, TP18",TestPoint_Bridge_Pitch2.0mm_Drill0.7mm,DNS,3,GND,,,,
+48,TP19,TestPoint_Keystone_5000-5004_Miniature,DNS,1,DBG_2,,,,
+49,TP20,TestPoint_Keystone_5000-5004_Miniature,DNS,1,DBG_1,,,,
+50,U1,LQFP-64_10x10mm_P0.5mm,SMD,1,STM32F446RET6,STMicroelectronics , STM32F446RET6 ," ARM Microcontrollers - MCU High-performance foundation line, Arm Cortex-M4 core DSP & FPU, 512 Kbytes of Fl ",https://www.mouser.de/en/ProductDetail/STMicroelectronics/STM32F446RET6?qs=Ok1pvOkw6%2FqpQsWf8F4wtQ%3D%3D
+51,U2,USB-C BMS Li-on Batterie Lademodul 3S 4.5V-15V 18W 3A,DNS,1,USB-C BMS Li-on Batterie Lademodul,,,,
+52,U3,WAVESHARE_DC_DC_CONVERTER,DNS,1,Waveshare DC-DC Buck Mini Module,,,,
+53,U4,DFN-6-1EP_3x3mm_P0.95mm_EP1.7x2.6mm,SMD,1,LDO40LPU33RY,STMicroelectronics ,LDO40LPU33RY ," LDO Voltage Regulators 400 mA, 38 V low-dropout regulator, with 45uAA quiescent current ",https://www.mouser.de/en/ProductDetail/STMicroelectronics/LDO40LPU33RY?qs=qSfuJ%252Bfl%2Fd5qazWclm%2Ffpg%3D%3D
+54,U6,SIMPLEFOCMINI BRUSHLESS DC MOTOR - DRI0058,DNS,1,SIMPLEFOCMINI BRUSHLESS DC MOTOR - DRI0058,,,,
+55,Y1,Crystal_SMD_3225-4Pin_3.2x2.5mm,SMD,1,16MHz,ABRACON , ABM8G-16.000MHZ-B4Y-T , Crystals 16.0 MHZ 10PF ,https://www.mouser.de/en/ProductDetail/ABRACON/ABM8G-16.000MHZ-B4Y-T?qs=3LVMET7lfiNdHBGmnVP0sw%3D%3D

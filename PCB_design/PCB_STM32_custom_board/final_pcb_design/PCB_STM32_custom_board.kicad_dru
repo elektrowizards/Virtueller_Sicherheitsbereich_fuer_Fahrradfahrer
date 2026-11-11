@@ -1,0 +1,12 @@
+(version 1)
+
+(rule "only through vias"
+  (constraint disallow micro_via buried_via))
+
+(rule "THT annular ring Multi-CB"
+  (condition "A.Type == 'Pad' && A.Pad_Type == 'Through-hole'")
+  (constraint annular_width (min 0.125mm)))
+
+(rule "U4 DFN pad spacing"
+  (condition "A.memberOfFootprint('U4') && B.memberOfFootprint('U4')")
+  (constraint clearance (min 0.15mm)))

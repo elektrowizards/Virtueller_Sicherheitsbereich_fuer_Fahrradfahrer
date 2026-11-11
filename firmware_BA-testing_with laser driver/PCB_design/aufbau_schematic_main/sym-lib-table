@@ -1,0 +1,4 @@
+(sym_lib_table
+	(version 7)
+	(lib (name "ba_virtueller_sicherheitsbereich_am_rad") (type "KiCad") (uri "${KIPRJMOD}/ba_virtueller_sicherheitsbereich_am_rad.kicad_sym") (options "") (descr ""))
+)
