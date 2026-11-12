@@ -42,7 +42,7 @@ constexpr int8_t BNO085_RESET_PIN = D7;
 constexpr uint32_t BNO085_BOOT_MS = 300;   // wait after the RST pulse
 constexpr uint8_t AS5600_ADDRESS = 0x36;
 
-constexpr uint32_t IMU_REPORT_US = 20000; // 50 Hz
+constexpr uint32_t IMU_REPORT_US = 10000; // 100 Hz (was 50 Hz: 20 ms target steps)
 constexpr uint32_t IMU_TIMEOUT_MS = 500;
 
 // Sign so that IMU_ROLL_SIGN * (BNO085 roll) is POSITIVE when the
@@ -88,6 +88,12 @@ constexpr float AXIS_OUTWARD_M = TABLE_TEST ? AXIS_OUTWARD_OF_EDGE_M : BIKE_AXIS
 // (+ = beam passes ABOVE the axis when it points horizontally).
 // An offset ALONG the beam (11.22 mm emitter offset) has no effect.
 constexpr float LASER_BEAM_OFFSET_M = 0.0f;
+
+// Low-pass on the roll used for the RUN target (first order, time
+// constant in s). Smooths the IMU sample steps into a continuous target;
+// costs about this much delay. 0 = off. Fault checks use the raw roll.
+// Toggle live with 'f' in RUN for comparison.
+constexpr float ROLL_FILTER_TF_S = 0.015f;
 
 // RUN mode:
 //   true  = hold the LINE DISTANCE on the ground:  alpha = theta(phi) - phi
