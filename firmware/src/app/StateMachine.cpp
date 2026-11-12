@@ -1353,11 +1353,18 @@ void StateMachine::update() {
                 Serial.print(", healthy: ");
                 Serial.print(imu_.isHealthy() ? "yes" : "no");
                 Serial.print(") - ");
+                // Unhealthy (a command failed): re-enabling the report is
+                // pointless, go straight to the full re-init.
+                if (!imu_.isHealthy() && imuRecoverLevel_ == 0)
+                    imuRecoverLevel_ = 1;
+
                 Serial.println(imuRecoverLevel_ == 0
                     ? "re-enabling the report"
                     : "re-initialising the BNO085");
 
-                imu_.recover(imuRecoverLevel_);
+                const bool ok = imu_.recover(imuRecoverLevel_);
+                Serial.print("[IMU] recovery ");
+                Serial.println(ok ? "accepted, waiting for data..." : "FAILED");
                 if (imuRecoverLevel_ < 3) imuRecoverLevel_++;
 
                 // begin_I2C() resets the I2C clock; the encoder shares it.

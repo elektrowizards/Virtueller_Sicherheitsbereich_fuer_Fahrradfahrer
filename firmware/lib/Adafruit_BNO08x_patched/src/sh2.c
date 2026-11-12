@@ -1773,7 +1773,11 @@ void sh2_close(void)
 {
     sh2_t *pSh2 = &_sh2;
     
-    shtp_close(pSh2->pShtp);
+    // PATCH (bike laser firmware): null-safe, so it can be called before a
+    // re-open even if the previous open failed.
+    if (pSh2->pShtp != 0) {
+        shtp_close(pSh2->pShtp);
+    }
 
     // Clear everything in sh2 structure.
     memset(pSh2, 0, sizeof(sh2_t));

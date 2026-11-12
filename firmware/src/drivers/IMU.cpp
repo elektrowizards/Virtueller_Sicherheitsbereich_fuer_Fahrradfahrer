@@ -124,6 +124,10 @@ bool IMU::recover(uint8_t level) {
         return healthy_;
     }
 
+    // The SH-2/SHTP layer has a single instance that begin_I2C() does not
+    // release: close it first, otherwise every re-init fails.
+    sh2_close();
+
     hardwareReset();
     healthy_ = bno_.begin_I2C(BNO085_ADDRESS, wire_) && enableReports();
     return healthy_;

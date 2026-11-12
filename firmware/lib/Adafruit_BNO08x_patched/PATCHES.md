@@ -14,3 +14,9 @@ unchanged. Licences: see license.txt and the headers of the sh2 files.
    them in this version) waited forever for the hub's reply. Now a default
    limit of `SH2_OP_DEFAULT_TIMEOUT_US` (0.5 s) applies; on timeout the
    operation ends with `SH2_ERR_TIMEOUT` as in the original code path.
+
+3. `src/sh2.c`, `sh2_close()`: null-safe (skips `shtp_close()` when no
+   SHTP instance is open). Needed because the firmware now calls
+   `sh2_close()` before every re-initialisation: the SHTP layer has only
+   one instance (`MAX_INSTANCES 1`) and `begin_I2C()` never closes it, so
+   a second `begin_I2C()` always failed.
