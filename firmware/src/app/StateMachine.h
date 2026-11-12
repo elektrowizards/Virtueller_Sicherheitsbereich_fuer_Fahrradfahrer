@@ -91,9 +91,6 @@ private:
 
     // ---- RUN ----
     float alignedBeamRad_ = NAN;     // theta0 + trim (world angle at phi=0)
-    float filteredPhiRad_ = 0.0f;    // low-passed roll for the RUN target
-    bool rollFilterOn_ = (ROLL_FILTER_TF_S > 0.0f);
-    uint32_t lastFilterMs_ = 0;
     float alignedMotorRad_ = NAN;    // shaft for alignedBeamRad_
     float motorTargetRad_ = 0.0f;
 

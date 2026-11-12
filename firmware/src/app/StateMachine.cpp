@@ -747,8 +747,6 @@ void StateMachine::beginRun(uint32_t now) {
     // RUN reference: world angle theta0 (+ the ALIGN fine trim) at phi = 0.
     alignedBeamRad_ = theta0Rad_ + alignTrimRad_;
     alignedMotorRad_ = shaftFromBeam(alignedBeamRad_);
-    filteredPhiRad_ = rollRad;      // filter starts at the current roll
-    lastFilterMs_ = now;
     motorTargetRad_ = shaftFromBeam(runBeamTargetRad(rollRad));
 
     motor_.setTarget(motorTargetRad_);
@@ -812,17 +810,7 @@ void StateMachine::updateMotor(uint32_t now) {
         // Outer loop: IMU roll -> geometry -> beam angle -> shaft target.
         // Distance hold: alpha = theta(phi) - phi, so the line stays at
         // TARGET_DISTANCE_M on the ground (laser moves with the lean).
-        // Smoothed roll for the target (raw roll for all checks above).
-        const float fdt = (uint32_t)(now - lastFilterMs_) * 0.001f;
-        lastFilterMs_ = now;
-        if (rollFilterOn_ && ROLL_FILTER_TF_S > 0.0f) {
-            const float a = fdt / (ROLL_FILTER_TF_S + fdt);
-            filteredPhiRad_ += a * (rollRad - filteredPhiRad_);
-        } else {
-            filteredPhiRad_ = rollRad;
-        }
-
-        float target = shaftFromBeam(runBeamTargetRad(filteredPhiRad_));
+        float target = shaftFromBeam(runBeamTargetRad(rollRad));
 
         // Synthetic track test ('q'): software sine instead of IMU roll.
         if (trackTest.isSynthetic()) {
@@ -1071,7 +1059,6 @@ void StateMachine::handleSerial(uint32_t now) {
                 Serial.println("Q = Synthetic track test + CSV (RUN)");
                 Serial.println("g = Guided tilt test (RUN): prompts the angles");
                 Serial.println("n = Next step of the tilt test");
-                Serial.println("f = Roll filter on/off (smoothing, compare in RUN)");
                 Serial.println("x = Abort track / tilt test");
                 Serial.println("i = Toggle I2C clock 100k/400k");
                 Serial.println("l = Toggle laser (ALIGN/RUN)");
@@ -1114,21 +1101,6 @@ void StateMachine::handleSerial(uint32_t now) {
 
             else if (command == 'n') {
                 tiltTest.next();
-            }
-
-            // =====================================
-            // ROLL FILTER ON / OFF (comparison)
-            // =====================================
-
-            else if (command == 'f') {
-                rollFilterOn_ = !rollFilterOn_;
-                Serial.print("[FILTER] roll low-pass ");
-                Serial.print(rollFilterOn_ ? "ON (Tf = " : "OFF");
-                if (rollFilterOn_) {
-                    Serial.print(ROLL_FILTER_TF_S * 1000.0f, 0);
-                    Serial.print(" ms)");
-                }
-                Serial.println();
             }
 
             // =====================================
