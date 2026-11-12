@@ -424,7 +424,7 @@ void StateMachine::finishCalibration() {
         lastLoopMs_ = 0;   // initFOC() blocked on purpose
         Serial.println("NO REFERENCE STORED - homing refused.");
         Serial.println("One-time reference: housing LEVEL on the table,");
-        Serial.print("trim with '[' (beam up) / ']' (beam down) until the line hits the mark at ");
+        Serial.print("trim with '[' / ']' (1 deg) and '{' / '}' (0.1 deg) until the line hits the mark at ");
         Serial.print(REFERENCE_DISTANCE_M, 3);
         Serial.println(" m from the edge,");
         Serial.println("then send 'z' to save.");
@@ -594,7 +594,7 @@ void StateMachine::updateAlignTarget(uint32_t now) {
         Serial.print(Geometry::radToDeg(alpha + phi), 2);
         Serial.print(", predicted line [m] = ");
         Serial.println(Geometry::predictedDistanceM(alpha, phi), 3);
-        Serial.println("Fine trim with '[' / ']', DOUBLE press -> RUN.");
+        Serial.println("Trim with '[' / ']' (1 deg), '{' / '}' (0.1 deg); 'z' saves; DOUBLE press -> RUN.");
         return;
     }
 
@@ -980,7 +980,7 @@ void StateMachine::printStatus(uint32_t now) {
         Serial.print(" D[m]=");
         Serial.print(Geometry::predictedDistanceM(alpha, phi), 3);
         Serial.print(" trim[deg]=");
-        Serial.print(Geometry::radToDeg(alignTrimRad_), 1);
+        Serial.print(Geometry::radToDeg(alignTrimRad_), 2);
 
         if (state_ == State::ALIGN) {
             Serial.print(homing_ ? " HOMING" :
@@ -1049,6 +1049,8 @@ void StateMachine::handleSerial(uint32_t now) {
                 Serial.println("m = Toggle monitoring");
                 Serial.println("] = Beam 1 deg DOWN (line closer, ALIGN)");
                 Serial.println("[ = Beam 1 deg UP (line further, ALIGN)");
+                Serial.println("} = Beam 0.1 deg DOWN (fine, ALIGN)");
+                Serial.println("{ = Beam 0.1 deg UP (fine, ALIGN)");
                 Serial.println("z = Save mechanical reference (ALIGN,");
                 Serial.println("    housing level, line on the mark)");
                 Serial.println("p = Print stored reference + geometry");
@@ -1192,14 +1194,20 @@ void StateMachine::handleSerial(uint32_t now) {
             // MOTOR POSITION CONTROL
             // =====================================
 
-            else if ((command == '[' || command == ']') &&
+            else if ((command == '[' || command == ']' ||
+                      command == '{' || command == '}') &&
                      state_ == State::ALIGN) {
 
+                // ']' / '}' = beam down (line closer)
                 float direction =
-                    (command == ']') ? 1.0f : -1.0f;
+                    (command == ']' || command == '}') ? 1.0f : -1.0f;
 
-                alignTrimRad_ += direction *
-                    Geometry::degToRad(ALIGN_STEP_DEG);
+                // '{' / '}' = fine step
+                const float step =
+                    (command == '{' || command == '}')
+                        ? ALIGN_FINE_STEP_DEG : ALIGN_STEP_DEG;
+
+                alignTrimRad_ += direction * Geometry::degToRad(step);
 
                 float limit =
                     Geometry::degToRad(MAX_ALIGN_TRIM_DEG);
@@ -1211,7 +1219,7 @@ void StateMachine::handleSerial(uint32_t now) {
 
                 // Applied (slew-limited) by updateAlignTarget().
                 Serial.print("[TRIM] beam trim = ");
-                Serial.print(Geometry::radToDeg(alignTrimRad_), 1);
+                Serial.print(Geometry::radToDeg(alignTrimRad_), 2);
                 Serial.println(" deg (+ = down)");
             }
 

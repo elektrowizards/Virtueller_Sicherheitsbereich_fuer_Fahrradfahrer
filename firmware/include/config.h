@@ -100,7 +100,8 @@ constexpr float MAX_HEIGHT_M = 2.00f;
 constexpr float MAX_ROLL_DEG = 30.0f;
 constexpr float MAX_MOTOR_DELTA_DEG = 35.0f;
 constexpr float MAX_ALIGN_TRIM_DEG = 25.0f;
-constexpr float ALIGN_STEP_DEG = 1.0f;
+constexpr float ALIGN_STEP_DEG = 1.0f;       // '[' / ']'  (~7 cm on the table floor)
+constexpr float ALIGN_FINE_STEP_DEG = 0.1f;  // '{' / '}'  (~7 mm; encoder: 0.088 deg/count)
 
 // ---- Beam angle / encoder ----
 // alpha = beam angle BELOW horizontal, relative to the housing
