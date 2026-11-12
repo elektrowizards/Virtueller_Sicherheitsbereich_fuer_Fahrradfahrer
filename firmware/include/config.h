@@ -166,4 +166,9 @@ constexpr uint32_t MOTOR_TARGET_PERIOD_MS = 5;
 constexpr uint32_t STATUS_PERIOD_MS = 500;
 
 constexpr float MAX_TRACKING_ERROR_DEG = 15.0f;
+
+// Consecutive failed AS5600 reads before the motor is stopped (one read
+// per loopFOC pass, ~5.5 kHz: 50 reads ~ 9 ms). Meanwhile the last valid
+// angle is used.
+constexpr uint32_t MAX_ENCODER_CONSECUTIVE_ERRORS = 50;
 constexpr uint32_t TRACKING_ERROR_TIMEOUT_MS = 450;

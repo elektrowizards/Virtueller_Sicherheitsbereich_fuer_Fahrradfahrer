@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <SimpleFOC.h>
+#include "drivers/AS5600Sensor.h"
 
 // ============================================================================
 //  MotorControl
@@ -44,12 +45,16 @@ public:
     // +1 / -1 as detected by initFOC(): shaft = dir * raw (+ 2pi*turns)
     int sensorDirection() const { return (int)motor_.sensor_direction; }
 
+    // Failed AS5600 reads (total since boot / currently in a row)
+    uint32_t encoderErrors() const { return encoder_.errorCount(); }
+    uint32_t encoderConsecutiveErrors() const { return encoder_.consecutiveErrors(); }
+
 private:
     void resetController();
 
     TwoWire* wire_ = nullptr;
 
-    MagneticSensorI2C encoder_;
+    AS5600Sensor encoder_;   // checked I2C reads (see AS5600Sensor.h)
     BLDCMotor motor_;
     BLDCDriver3PWM driver_;
 

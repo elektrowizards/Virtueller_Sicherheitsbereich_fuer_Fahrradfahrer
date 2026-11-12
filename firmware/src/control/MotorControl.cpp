@@ -8,7 +8,7 @@ inline float clampf(float v, float lo, float hi) {
 }
 
 MotorControl::MotorControl()
-    : encoder_(AS5600_I2C),
+    : encoder_(AS5600_ADDRESS),
       motor_(MOTOR_POLE_PAIRS),
       driver_(
           MOTOR_IN1,
@@ -47,7 +47,7 @@ bool MotorControl::begin(TwoWire& wire) {
 
     if (!magnetOK()) return false;
 
-    encoder_.init(&wire);
+    if (!encoder_.init(&wire)) return false;
     // Velocity is computed over at least this window (bench value).
     encoder_.min_elapsed_time = MOTOR_ENC_MIN_ELAPSED_S;
     motor_.linkSensor(&encoder_);

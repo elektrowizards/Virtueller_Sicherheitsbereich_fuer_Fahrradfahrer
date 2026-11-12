@@ -776,6 +776,16 @@ void StateMachine::updateMotor(uint32_t now) {
         return;
     }
 
+    // Blind motor: the encoder (shared I2C bus) delivers no valid angle.
+    if (motor_.encoderConsecutiveErrors() >= MAX_ENCODER_CONSECUTIVE_ERRORS) {
+        Serial.print("AS5600 failed reads in a row: ");
+        Serial.print(motor_.encoderConsecutiveErrors());
+        Serial.print(", total: ");
+        Serial.println(motor_.encoderErrors());
+        fail("AS5600 read errors (I2C)");
+        return;
+    }
+
     if (state_ == State::RUN) {
         if (!imu_.isFresh(IMU_TIMEOUT_MS)) {
             fail("IMU data timeout");
@@ -983,6 +993,9 @@ void StateMachine::printStatus(uint32_t now) {
 
         Serial.print(" loop[Hz]=");
         Serial.print(motor_.loopRateHz());
+
+        Serial.print(" encErr=");
+        Serial.print(motor_.encoderErrors());
     }
 
     if (state_ == State::ERROR) {
