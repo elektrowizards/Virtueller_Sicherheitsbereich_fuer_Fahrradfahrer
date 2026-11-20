@@ -67,9 +67,40 @@ constexpr bool TABLE_TEST = true;
 
 // ---- Bike geometry (pivot = tyre contact line, on the ground) ----
 // Laser rotation axis above the tyre contact line, bike upright [m]
+// Start value; with TOF_HEIGHT_CALIBRATION the ToF measures it on the bike.
 constexpr float BIKE_AXIS_HEIGHT_M = 0.80f;          // FILL IN when mounted
 // Rotation axis lateral offset from the bike centre plane, + = toward line
 constexpr float BIKE_AXIS_OUTWARD_M = 0.0f;
+
+// ---- ToF height calibration (enclosure_v3, bike only) ----
+// The VL53L8CX sits in the bevel on the foot's lower RIGHT edge and looks
+// down and to the right, past the rear wheel. On the SHORT press (unit
+// mounted, bike held UPRIGHT on flat ground) it fits the ground plane in
+// its 8x8 zones and measures the axis height; BIKE_AXIS_HEIGHT_M is then
+// only the start value. false = use BIKE_AXIS_HEIGHT_M (ToF bypassed).
+constexpr bool TOF_HEIGHT_CALIBRATION = true;
+constexpr float TOF_TILT_DEG = 40.0f;      // bevel: sensor axis from straight down (Tof_Angle)
+constexpr float TOF_SIDE = 1.0f;           // +1 = sensor looks right, -1 = left
+// Sensor optical centre -> laser pivot on the motor axis, housing frame
+// (X rearward, Y right, Z up) [m], from build_enclosure_v3.py
+constexpr float TOF_TO_PIVOT_X_M = 0.02497f;
+constexpr float TOF_TO_PIVOT_Y_M = -0.02053f;
+constexpr float TOF_TO_PIVOT_Z_M = 0.01285f;
+constexpr float TOF_FOV_DEG = 45.0f;       // per axis, 8 zones each
+// VERIFY ONCE ('t' + tape measure): true = each zone reports the distance
+// along its own ray, false = along the optical axis.
+constexpr bool TOF_DISTANCE_IS_RADIAL = true;
+// Zone grid direction along housing X (+1/-1). Only the pitch term uses
+// it. 't' prints the housing pitch, + = top tilted rearward (like a
+// seatpost): if the sign is wrong on the bike, flip this.
+constexpr float TOF_GRID_ALONG_X_SIGN = 1.0f;
+constexpr uint8_t TOF_MIN_PLANE_ZONES = 16;      // of 64 zones
+constexpr float TOF_PLANE_INLIER_M = 0.04f;      // zone lies on the ground plane
+constexpr float TOF_PLANE_MAX_RMS_M = 0.02f;
+constexpr float TOF_TILT_TOLERANCE_DEG = 15.0f;  // plane accepted as the ground
+constexpr float TOF_MAX_CAL_ROLL_DEG = 5.0f;     // bike must stand upright
+constexpr float TOF_MAX_FRAME_SPREAD_M = 0.015f; // the good frames must agree
+constexpr uint8_t TOF_TEST_FRAMES = 10;          // 't' command
 
 // ---- Table geometry (pivot = table edge over which the line is cast) ----
 constexpr float TABLE_SURFACE_HEIGHT_M = 0.70f;      // FILL IN: measure floor -> table top
@@ -94,7 +125,7 @@ constexpr float LASER_BEAM_OFFSET_M = 0.0f;
 //   false = hold the world BEAM ANGLE (pure gimbal): alpha = theta0 - phi
 constexpr bool RUN_HOLD_DISTANCE = true;
 
-constexpr float MIN_HEIGHT_M = 0.20f;   // ToF plausibility (ToF bypassed)
+constexpr float MIN_HEIGHT_M = 0.20f;   // ToF plausibility of the measured r_up
 constexpr float MAX_HEIGHT_M = 2.00f;
 
 constexpr float MAX_ROLL_DEG = 30.0f;
@@ -161,7 +192,7 @@ constexpr uint32_t DOUBLE_PRESS_MS = 350;
 
 constexpr uint32_t CALIBRATION_TIMEOUT_MS = 7000;
 constexpr uint32_t TOF_POLL_MS = 80;
-constexpr uint8_t REQUIRED_TOF_FRAMES = 5;
+constexpr uint8_t REQUIRED_TOF_FRAMES = 5;   // good ToF frames (5 Hz) for the height
 
 constexpr uint32_t MOTOR_TARGET_PERIOD_MS = 5;
 constexpr uint32_t STATUS_PERIOD_MS = 500;

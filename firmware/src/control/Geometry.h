@@ -27,6 +27,11 @@ namespace Geometry {
     // Rotation-axis position in the world frame for roll phi
     void axisPosition(float phiRad, float& yM, float& zM);
 
+    // Axis above the pivot with the housing level (r_up). Default:
+    // AXIS_ABOVE_PIVOT_M; on the bike the ToF calibration sets it.
+    void setAxisAbovePivotM(float rUpM);
+    float axisAbovePivotM();
+
     // World beam angle that puts the line at distanceM for roll phi
     float requiredWorldAngleRad(float phiRad, float distanceM);
 

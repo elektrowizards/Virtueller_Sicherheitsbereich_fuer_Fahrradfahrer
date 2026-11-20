@@ -9,6 +9,7 @@
 #include "drivers/LaserDriver.h"
 
 #include "estimation/RollEstimator.h"
+#include "estimation/GroundPlane.h"
 #include "control/MotorControl.h"
 
 #include "ButtonHandler.h"
@@ -97,6 +98,16 @@ private:
     float heightSumM_ = 0.0f;
     uint8_t calibrationFrames_ = 0;
 
+    // ---- ToF height calibration (bike, enclosure_v3) ----
+    static constexpr uint8_t MAX_TOF_HEIGHTS = 16;
+    float tofHeights_[MAX_TOF_HEIGHTS] = {};   // r_up of the good frames
+    uint8_t tofGood_ = 0;
+    uint16_t tofFramesSeen_ = 0;
+    const char* tofLastReason_ = "no frame";
+    // 't' test in IDLE: frames left (0 = off)
+    uint8_t tofTestLeft_ = 0;
+    uint32_t tofTestStartMs_ = 0;
+
     uint32_t calibrationStartMs_ = 0;
     uint32_t lastToFPollMs_ = 0;
     uint32_t lastImuPollMs_ = 0;
@@ -117,6 +128,11 @@ private:
     void startCalibration();
     void updateCalibration(uint32_t now);
     void finishCalibration();
+    bool tofCalibrationActive() const;
+    void printToFResult(const GroundPlane::Result& r) const;
+    void startToFTest(uint32_t now);
+    void stopToFTest();
+    void updateToFTest(uint32_t now);
 
     void startHoming(uint32_t now);
     void updateAlignTarget(uint32_t now);

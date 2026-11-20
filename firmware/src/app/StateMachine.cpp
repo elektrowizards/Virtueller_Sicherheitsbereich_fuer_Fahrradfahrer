@@ -51,6 +51,9 @@ void StateMachine::changeState(State next) {
         next != State::CALIBRATION) {
         tof_.stop();
     }
+    if (next != State::IDLE) {
+        stopToFTest();
+    }
 
     // Laser off on every transition; applyLaserForState()
     // switches it on again only for ALIGN and RUN.
@@ -177,7 +180,8 @@ void StateMachine::begin() {
     Serial.print(" p=");
     Serial.print(PIVOT_HEIGHT_M, 3);
     Serial.print(" r_up=");
-    Serial.print(AXIS_ABOVE_PIVOT_M, 3);
+    Serial.print(Geometry::axisAbovePivotM(), 3);
+    Serial.print(tofCalibrationActive() ? " (ToF measures it)" : "");
     Serial.print(" r_out=");
     Serial.print(AXIS_OUTWARD_M, 3);
     Serial.print(" D=");
@@ -263,6 +267,10 @@ void StateMachine::handleButton(
 // CALIBRATION
 // ==========================================
 
+bool StateMachine::tofCalibrationActive() const {
+    return TOF_HEIGHT_CALIBRATION && !TABLE_TEST;
+}
+
 void StateMachine::startCalibration() {
 
     // Verify IMU data
@@ -275,15 +283,40 @@ void StateMachine::startCalibration() {
     motor_.stop();
     laser_.off();
 
-    // ToF bypassed: geometry comes from config.h
     heightSumM_ = 0.0f;
-    calibrationFrames_ = REQUIRED_TOF_FRAMES;
-
     alignTrimRad_ = 0.0f;
     homing_ = false;
     homed_ = false;
 
-    Serial.println("CALIBRATION: geometry from config.h (ToF bypassed)");
+    if (tofCalibrationActive()) {
+        // Measure the laser axis height with the ToF (enclosure_v3 bevel)
+        stopToFTest();
+        tofGood_ = 0;
+        tofFramesSeen_ = 0;
+        tofLastReason_ = "no frame";
+        calibrationFrames_ = 0;
+
+        if (!tof_.start()) {
+            fail("ToF start failed");
+            return;
+        }
+
+        calibrationStartMs_ = millis();
+        lastToFPollMs_ = calibrationStartMs_;
+
+        Serial.println("CALIBRATION: measuring the laser height with the ToF.");
+        Serial.println("  Hold the bike UPRIGHT on flat ground, keep the right side clear.");
+
+        changeState(State::CALIBRATION);
+        return;
+    }
+
+    // ToF not used: geometry comes from config.h
+    calibrationFrames_ = REQUIRED_TOF_FRAMES;
+
+    Serial.println(TABLE_TEST
+        ? "CALIBRATION: table geometry from config.h (ToF not used)"
+        : "CALIBRATION: geometry from config.h (TOF_HEIGHT_CALIBRATION = false)");
 
     changeState(State::CALIBRATION);
 
@@ -300,7 +333,17 @@ void StateMachine::updateCalibration(uint32_t now) {
 
     if ((uint32_t)(now - calibrationStartMs_)
         > CALIBRATION_TIMEOUT_MS) {
-        fail("Calibration timeout");
+        // Not a hardware fault: back to IDLE, the user can retry.
+        Serial.print("CALIBRATION FAILED: no stable ToF height (");
+        Serial.print(tofGood_);
+        Serial.print(" good of ");
+        Serial.print(tofFramesSeen_);
+        Serial.print(" frames, last: ");
+        Serial.print(tofLastReason_);
+        Serial.println(").");
+        Serial.println("  Bike upright on flat ground, sensor in shade, nothing beside");
+        Serial.println("  the right side - then SHORT press again. 't' shows each frame.");
+        changeState(State::IDLE);
         return;
     }
 
@@ -310,25 +353,158 @@ void StateMachine::updateCalibration(uint32_t now) {
     lastToFPollMs_ = now;
 
     if (tof_.update()) {
-        float distanceM =
-            tof_.getDistanceMm() / 1000.0f;
+        tofFramesSeen_++;
 
-        if (!isfinite(distanceM)) return;
+        const GroundPlane::Result r = GroundPlane::evaluate(
+            tof_.zoneDistancesMm(), tof_.zoneValid());
+        printToFResult(r);
 
-        heightSumM_ += distanceM;
-        calibrationFrames_++;
+        if (!r.ok) {
+            tofLastReason_ = r.reason;
+        } else if (fabsf(r.rollDeg) > TOF_MAX_CAL_ROLL_DEG) {
+            tofLastReason_ = "bike not upright";
+        } else {
+            tofHeights_[tofGood_++] = r.axisAbovePivotM;
+            calibrationFrames_ = tofGood_;
 
-        Serial.print("ToF frame ");
-        Serial.print(calibrationFrames_);
-        Serial.print(": ");
-        Serial.print(distanceM, 3);
-        Serial.println(" m");
+            if (tofGood_ >= REQUIRED_TOF_FRAMES) {
+                float lo = tofHeights_[0], hi = tofHeights_[0];
+                for (uint8_t i = 1; i < tofGood_; i++) {
+                    lo = fminf(lo, tofHeights_[i]);
+                    hi = fmaxf(hi, tofHeights_[i]);
+                }
 
-        if (calibrationFrames_ >= REQUIRED_TOF_FRAMES)
-            finishCalibration();
+                if (hi - lo > TOF_MAX_FRAME_SPREAD_M) {
+                    // Drop the oldest frame and keep measuring
+                    tofLastReason_ = "frames disagree (bike moving?)";
+                    for (uint8_t i = 1; i < tofGood_; i++)
+                        tofHeights_[i - 1] = tofHeights_[i];
+                    tofGood_--;
+                    calibrationFrames_ = tofGood_;
+                } else {
+                    // Median of the good frames
+                    float sorted[MAX_TOF_HEIGHTS];
+                    for (uint8_t i = 0; i < tofGood_; i++) {
+                        float v = tofHeights_[i];
+                        uint8_t j = i;
+                        while (j > 0 && sorted[j - 1] > v) {
+                            sorted[j] = sorted[j - 1];
+                            j--;
+                        }
+                        sorted[j] = v;
+                    }
+                    const float h = (tofGood_ % 2)
+                        ? sorted[tofGood_ / 2]
+                        : 0.5f * (sorted[tofGood_ / 2 - 1] + sorted[tofGood_ / 2]);
+
+                    Geometry::setAxisAbovePivotM(h);
+
+                    Serial.print("ToF HEIGHT: laser axis r_up = ");
+                    Serial.print(h, 3);
+                    Serial.print(" m (median of ");
+                    Serial.print(tofGood_);
+                    Serial.print(" frames, spread ");
+                    Serial.print((hi - lo) * 1000.0f, 1);
+                    Serial.print(" mm; config start value ");
+                    Serial.print(BIKE_AXIS_HEIGHT_M, 3);
+                    Serial.println(" m)");
+
+                    finishCalibration();
+                    return;
+                }
+            }
+        }
     }
 
     if (!tof_.isHealthy()) {
+        fail("ToF communication error");
+    }
+}
+
+// One line per ToF frame: plane fit and the resulting heights
+void StateMachine::printToFResult(const GroundPlane::Result& r) const {
+    Serial.print("[ToF] zones ");
+    Serial.print(r.zones);
+    Serial.print("/64");
+    if (!r.ok) {
+        Serial.print(" REJECTED: ");
+        Serial.print(r.reason);
+        if (isfinite(r.tiltDeg)) {
+            Serial.print(" (tilt ");
+            Serial.print(r.tiltDeg, 1);
+            Serial.print(" deg)");
+        }
+        Serial.println();
+        return;
+    }
+    Serial.print(" plane ");
+    Serial.print(r.inliers);
+    Serial.print(" rms ");
+    Serial.print(r.rmsM * 1000.0f, 1);
+    Serial.print(" mm | sensor ");
+    Serial.print(r.sensorHeightM, 3);
+    Serial.print(" m, tilt ");
+    Serial.print(r.tiltDeg, 1);
+    Serial.print(" roll ");
+    Serial.print(r.rollDeg, 1);
+    Serial.print(" pitch ");
+    Serial.print(r.pitchDeg, 1);
+    Serial.print(" deg | pivot ");
+    Serial.print(r.pivotHeightM, 3);
+    Serial.print(" m, r_up ");
+    Serial.print(r.axisAbovePivotM, 3);
+    Serial.println(" m");
+}
+
+// ==========================================
+// ToF TEST ('t', IDLE, motor off)
+// ==========================================
+
+void StateMachine::startToFTest(uint32_t now) {
+    if (tofTestLeft_ > 0) {
+        Serial.println("[ToF] Test already running");
+        return;
+    }
+    if (!tof_.start()) {
+        Serial.println("[ToF] Start failed");
+        return;
+    }
+    tofTestLeft_ = TOF_TEST_FRAMES;
+    tofTestStartMs_ = now;
+    lastToFPollMs_ = now;
+    Serial.println("[ToF] Test: hold still. 'pivot' = ground -> motor axis centre,");
+    Serial.println("      compare it once with a tape measure (bike upright).");
+}
+
+void StateMachine::stopToFTest() {
+    if (tofTestLeft_ == 0) return;
+    tofTestLeft_ = 0;
+    tof_.stop();
+}
+
+void StateMachine::updateToFTest(uint32_t now) {
+    if (tofTestLeft_ == 0) return;
+
+    if ((uint32_t)(now - tofTestStartMs_) > 1000u * (TOF_TEST_FRAMES + 3u)) {
+        Serial.println("[ToF] Test timeout");
+        stopToFTest();
+        return;
+    }
+
+    if ((uint32_t)(now - lastToFPollMs_) < TOF_POLL_MS) return;
+    lastToFPollMs_ = now;
+
+    if (tof_.update()) {
+        printToFResult(GroundPlane::evaluate(
+            tof_.zoneDistancesMm(), tof_.zoneValid()));
+        if (--tofTestLeft_ == 0) {
+            tof_.stop();
+            Serial.println("[ToF] Test done");
+        }
+    }
+
+    if (!tof_.isHealthy()) {
+        stopToFTest();
         fail("ToF communication error");
     }
 }
@@ -1054,6 +1230,8 @@ void StateMachine::handleSerial(uint32_t now) {
                 Serial.println("z = Save mechanical reference (ALIGN,");
                 Serial.println("    housing level, line on the mark)");
                 Serial.println("p = Print stored reference + geometry");
+                Serial.println("t = ToF height test (IDLE): 10 frames, check");
+                Serial.println("    'pivot' once with a tape measure");
                 Serial.println("! = Stop motor");
                 Serial.println("r = Track test, summary only (RUN)");
                 Serial.println("R = Track test, summary + CSV (RUN)");
@@ -1152,6 +1330,14 @@ void StateMachine::handleSerial(uint32_t now) {
 
             else if (command == 'z') {
                 saveReference();
+            }
+
+            else if (command == 't') {
+                if (state_ == State::IDLE) {
+                    startToFTest(now);
+                } else {
+                    Serial.println("[ToF] Test only in IDLE (motor off)");
+                }
             }
 
             else if (command == 'p') {
@@ -1418,6 +1604,10 @@ void StateMachine::update() {
 
     if (state_ == State::CALIBRATION) {
         updateCalibration(now);
+    }
+
+    if (state_ == State::IDLE) {
+        updateToFTest(now);
     }
 
     if (state_ == State::ERROR) {

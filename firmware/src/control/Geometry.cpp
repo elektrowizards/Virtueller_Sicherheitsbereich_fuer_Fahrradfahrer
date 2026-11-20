@@ -10,6 +10,10 @@ namespace {
     // Beam origin = rotation axis + perpendicular beam offset.
     // Beam direction (y,z) = (cos t, -sin t); its "up" normal is
     // (sin t, cos t).
+    // Axis above the pivot, housing level (r_up). Starts with config.h,
+    // the ToF calibration replaces it on the bike.
+    float s_axisAbovePivotM = AXIS_ABOVE_PIVOT_M;
+
     void beamOrigin(float phiRad, float thetaRad, float& y, float& z) {
         Geometry::axisPosition(phiRad, y, z);
         y += LASER_BEAM_OFFSET_M * sinf(thetaRad);
@@ -20,8 +24,16 @@ namespace {
 void Geometry::axisPosition(float phiRad, float& yM, float& zM) {
     const float s = sinf(phiRad);
     const float c = cosf(phiRad);
-    yM = AXIS_OUTWARD_M * c + AXIS_ABOVE_PIVOT_M * s;
-    zM = PIVOT_HEIGHT_M + AXIS_ABOVE_PIVOT_M * c - AXIS_OUTWARD_M * s;
+    yM = AXIS_OUTWARD_M * c + s_axisAbovePivotM * s;
+    zM = PIVOT_HEIGHT_M + s_axisAbovePivotM * c - AXIS_OUTWARD_M * s;
+}
+
+void Geometry::setAxisAbovePivotM(float rUpM) {
+    if (isfinite(rUpM)) s_axisAbovePivotM = rUpM;
+}
+
+float Geometry::axisAbovePivotM() {
+    return s_axisAbovePivotM;
 }
 
 float Geometry::requiredWorldAngleRad(float phiRad, float distanceM) {

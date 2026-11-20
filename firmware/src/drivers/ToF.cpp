@@ -13,8 +13,9 @@ bool ToF::begin(TwoWire& wire) {
 
     if (sensor_.init() != 0) return false;
 
+    // 8x8 zones: the ground-plane fit needs the whole field of view
     if (sensor_.set_resolution(
-        VL53L8CX_RESOLUTION_4X4
+        VL53L8CX_RESOLUTION_8X8
     ) != 0) return false;
 
     if (sensor_.set_ranging_frequency_hz(5) != 0)
@@ -27,8 +28,10 @@ bool ToF::begin(TwoWire& wire) {
 
 bool ToF::start() {
     if (!initialized_) return false;
+    if (ranging_) return true;
 
     distanceMm_ = NAN;
+    validCount_ = 0;
 
     if (sensor_.start_ranging() != 0) {
         healthy_ = false;
@@ -66,10 +69,8 @@ bool ToF::update() {
         return false;
     }
 
-    Serial.println("[ToF] NEW FRAME RECEIVED");
-
-    // STEP 2: Read measurement results
-    VL53L8CX_ResultsData results;
+    // STEP 2: Read measurement results (large struct: keep it off the stack)
+    static VL53L8CX_ResultsData results;
 
     status = sensor_.get_ranging_data(&results);
 
@@ -80,65 +81,30 @@ bool ToF::update() {
         return false;
     }
 
-    // STEP 3: Inspect the four central zones
-    const uint8_t centerZones[4] = {5, 6, 9, 10};
+    // STEP 3: Store every zone. Status 5 = valid, 9 = valid with a large
+    // pulse (both used by ST as valid ranges).
+    validCount_ = 0;
+    for (uint8_t zone = 0; zone < ZONES; zone++) {
+        const uint16_t index = zone * VL53L8CX_NB_TARGET_PER_ZONE;
+        const uint8_t st = results.target_status[index];
+        const int16_t d = results.distance_mm[index];
 
+        zoneMm_[zone] = d;
+        zoneValid_[zone] = results.nb_target_detected[zone] >= 1 &&
+                           (st == 5 || st == 9) && d > 0;
+        if (zoneValid_[zone]) validCount_++;
+    }
+
+    // Centre zones of the 8x8 grid (diagnostics)
+    const uint8_t centerZones[4] = {27, 28, 35, 36};
     float sum = 0.0f;
     int count = 0;
-
     for (uint8_t zone : centerZones) {
-
-        uint16_t index =
-            zone * VL53L8CX_NB_TARGET_PER_ZONE;
-
-        uint8_t targets =
-            results.nb_target_detected[zone];
-
-        uint8_t targetStatus =
-            results.target_status[index];
-
-        int distance =
-            results.distance_mm[index];
-
-        Serial.print("Zone ");
-        Serial.print(zone);
-
-        Serial.print(" | targets: ");
-        Serial.print(targets);
-
-        Serial.print(" | status: ");
-        Serial.print(targetStatus);
-
-        Serial.print(" | distance: ");
-        Serial.println(distance);
-
-        if (targets < 1)
-            continue;
-
-        if (targetStatus != 5)
-            continue;
-
-        if (distance < MIN_HEIGHT_M * 1000.0f ||
-            distance > MAX_HEIGHT_M * 1000.0f)
-            continue;
-
-        sum += distance;
+        if (!zoneValid_[zone]) continue;
+        sum += zoneMm_[zone];
         count++;
     }
-
-    // STEP 4: Check how many zones passed
-    Serial.print("[ToF] Valid zones: ");
-    Serial.println(count);
-
-    if (count < 2) {
-        Serial.println("[ToF] Frame rejected");
-        return false;
-    }
-
-    distanceMm_ = sum / count;
-
-    Serial.print("[ToF] Accepted distance: ");
-    Serial.println(distanceMm_);
+    distanceMm_ = count > 0 ? sum / count : NAN;
 
     return true;
 }
